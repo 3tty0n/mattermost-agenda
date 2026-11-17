@@ -38,7 +38,7 @@ type Props = {
     assigneeId?: string;
     revision: number;
     onOpenTask: (taskID: string) => void;
-    onOpenEvent: (eventID: string) => void;
+    onOpenEvent: (eventID: string, occurrenceStartAt?: number) => void;
     onCreateEvent: (day: Date) => void;
     onCreateTask: (day: Date) => void;
 };
@@ -276,6 +276,7 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                 <EventCalendarCard
                     key={`${occurrence.event.id}:${occurrence.dateKey}`}
                     event={occurrence.event}
+                    occurrenceStartAt={occurrence.originalStart}
                     profiles={profiles}
                     onOpen={onOpenEvent}
                 />

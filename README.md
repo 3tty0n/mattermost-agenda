@@ -19,7 +19,8 @@ external service, no second database.
   with participants, an optional **location** (a Zoom/Meet URL becomes a link on the card) and a
   time zone.
 - **Repeating:** daily, weekly (chosen weekdays), monthly, yearly or custom, with an optional end
-  date. Completing a repeating task moves it to its next date.
+  date. Completing a repeating task moves it to its next date. Individual occurrences of a repeating
+  event can be moved or cancelled without changing the series.
 - **Reminders:** a direct message from the plugin bot before a task's due time or an event's start;
   pick any of *at the time, 5 / 10 / 15 minutes, 1 day, 1 week* before.
 - **Visibility:** *Only me*, *Team* or *Channel*; the server re-checks it on every request.
@@ -89,6 +90,11 @@ Click the check-circle icon in the channel header to open the sidebar.
 - Click an event to open a read-only view; the creator or an administrator can press **Edit** (and
   delete it there). The view can copy the event to **Google Calendar** or **Outlook** (a prefilled
   new-event page opens) or download an **.ics** file for any calendar app.
+- **Editing a repeating event** asks whether to change *all* occurrences or *just this one*. “Just
+  this one” moves a single occurrence to another date and time, or cancels it, without touching the
+  rest of the series (the series title, participants and reminders stay shared). Changing the
+  series' start time, time zone or pattern resets any per-occurrence exceptions. The calendar,
+  reminders and .ics export (`EXDATE` / `RECURRENCE-ID`) all honour the exceptions.
 
 <p align="center">
   <img src="docs/images/calendar-week.png" alt="Week view on a wide sidebar" width="720">

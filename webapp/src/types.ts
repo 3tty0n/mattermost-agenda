@@ -52,6 +52,16 @@ export type EventRecurrence = {
     until?: string;
 };
 
+// EventOverride moves or cancels one occurrence of a recurring event. originalStart is the start
+// instant the occurrence would have had in the unmodified series; cancelled removes it, otherwise
+// startAt/endAt replace its times. Everything else stays shared with the series.
+export type EventOverride = {
+    originalStart: number;
+    startAt: number;
+    endAt: number;
+    cancelled?: boolean;
+};
+
 export type Event = {
     id: string;
     teamId: string;
@@ -67,6 +77,7 @@ export type Event = {
     allDay?: boolean;
     timezone?: string;
     recurrence?: EventRecurrence;
+    overrides?: EventOverride[];
     reminders?: number[];
     createdAt: number;
     updatedAt: number;
@@ -115,6 +126,10 @@ export type UpdateEventInput = {
     timezone?: string;
     recurrence?: EventRecurrence;
     reminders?: number[];
+
+    // Set to move or cancel one occurrence of a recurring series instead of the whole series.
+    occurrenceStartAt?: number;
+    occurrenceCancelled?: boolean;
 };
 
 export type ListResult<T> = {

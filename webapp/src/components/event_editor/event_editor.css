@@ -158,3 +158,10 @@
 .Tasks-EventEditor__preview--editable:hover {
     border-color: rgba(var(--center-channel-color-rgb), 0.32);
 }
+
+/* This-event-only vs all-events, shown when editing one occurrence of a recurring series. */
+.Tasks-EventEditor__editScope {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xxs);
+}

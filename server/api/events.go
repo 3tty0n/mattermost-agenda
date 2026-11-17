@@ -58,23 +58,29 @@ type updateEventRequest struct {
 	TimeZone    *string                    `json:"timezone"`
 	Recurrence  *taskmodel.EventRecurrence `json:"recurrence"`
 	Reminders   *[]int                     `json:"reminders"`
+	// OccurrenceStartAt targets one occurrence of a recurring series; OccurrenceCancelled removes
+	// it instead of moving it.
+	OccurrenceStartAt   *int64 `json:"occurrenceStartAt"`
+	OccurrenceCancelled *bool  `json:"occurrenceCancelled"`
 }
 
 func (req updateEventRequest) patch() taskmodel.EventPatch {
 	return taskmodel.EventPatch{
-		TeamID:      req.TeamID,
-		ChannelID:   req.ChannelID,
-		Visibility:  req.Visibility,
-		Title:       req.Title,
-		Description: req.Description,
-		Location:    req.Location,
-		AssigneeIDs: req.AssigneeIDs,
-		StartAt:     req.StartAt,
-		EndAt:       req.EndAt,
-		AllDay:      req.AllDay,
-		TimeZone:    req.TimeZone,
-		Recurrence:  req.Recurrence,
-		Reminders:   req.Reminders,
+		TeamID:              req.TeamID,
+		ChannelID:           req.ChannelID,
+		Visibility:          req.Visibility,
+		Title:               req.Title,
+		Description:         req.Description,
+		Location:            req.Location,
+		AssigneeIDs:         req.AssigneeIDs,
+		StartAt:             req.StartAt,
+		EndAt:               req.EndAt,
+		AllDay:              req.AllDay,
+		TimeZone:            req.TimeZone,
+		Recurrence:          req.Recurrence,
+		Reminders:           req.Reminders,
+		OccurrenceStartAt:   req.OccurrenceStartAt,
+		OccurrenceCancelled: req.OccurrenceCancelled,
 	}
 }
 

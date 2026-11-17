@@ -46,7 +46,7 @@ import type {Task, TaskQuery, TaskSort, TaskStatus, TaskSummary, TaskVisibility}
 import './sidebar.css';
 
 type TaskEditorState = {task?: Task; defaults?: TaskEditorDefaults};
-type EventEditorState = {eventId?: string; defaults?: EventEditorDefaults};
+type EventEditorState = {eventId?: string; occurrenceStartAt?: number; defaults?: EventEditorDefaults};
 type Scope = 'team' | 'my';
 
 const BOARD_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'done'];
@@ -99,7 +99,7 @@ export default function TasksSidebar() {
     const [actionError, setActionError] = useState<string>();
     const [taskEditor, setTaskEditor] = useState<TaskEditorState>();
     const [eventEditor, setEventEditor] = useState<EventEditorState>();
-    const [viewEventID, setViewEventID] = useState<string>();
+    const [viewEvent, setViewEvent] = useState<{eventId: string; occurrenceStartAt?: number}>();
     const eventDurationMinutes = useDefaultEventDuration();
     const [previewTaskID, setPreviewTaskID] = useState<string>();
     const [quickAddStatus, setQuickAddStatus] = useState<TaskStatus>();
@@ -818,7 +818,7 @@ export default function TasksSidebar() {
                         assigneeId={filters.assigneeId || undefined}
                         revision={tasksRevision}
                         onOpenTask={openCalendarTask}
-                        onOpenEvent={setViewEventID}
+                        onOpenEvent={(eventID, occurrenceStartAt) => setViewEvent({eventId: eventID, occurrenceStartAt})}
                         onCreateEvent={openCreateEvent}
                         onCreateTask={openCreateTask}
                     />
@@ -836,19 +836,21 @@ export default function TasksSidebar() {
                     }}
                 />
             )}
-            {viewEventID && (
+            {viewEvent && (
                 <EventDetail
-                    eventId={viewEventID}
-                    onClose={() => setViewEventID(undefined)}
+                    eventId={viewEvent.eventId}
+                    occurrenceStartAt={viewEvent.occurrenceStartAt}
+                    onClose={() => setViewEvent(undefined)}
                     onEdit={() => {
-                        setEventEditor({eventId: viewEventID});
-                        setViewEventID(undefined);
+                        setEventEditor({eventId: viewEvent.eventId, occurrenceStartAt: viewEvent.occurrenceStartAt});
+                        setViewEvent(undefined);
                     }}
                 />
             )}
             {eventEditor && (
                 <EventEditor
                     eventId={eventEditor.eventId}
+                    occurrenceStartAt={eventEditor.occurrenceStartAt}
                     defaultDurationMinutes={eventDurationMinutes}
                     defaults={eventEditor.defaults}
                     onClose={() => setEventEditor(undefined)}

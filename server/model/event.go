@@ -28,10 +28,12 @@ type Event struct {
 	AllDay      bool             `json:"allDay,omitempty"`
 	TimeZone    string           `json:"timezone,omitempty"`
 	Recurrence  *EventRecurrence `json:"recurrence,omitempty"`
-	Reminders   []int            `json:"reminders,omitempty"`
-	CreatedAt   int64            `json:"createdAt"`
-	UpdatedAt   int64            `json:"updatedAt"`
-	Version     int64            `json:"version"`
+	// Overrides move or cancel single occurrences of the series; empty unless the event repeats.
+	Overrides []EventOverride `json:"overrides,omitempty"`
+	Reminders []int           `json:"reminders,omitempty"`
+	CreatedAt int64           `json:"createdAt"`
+	UpdatedAt int64           `json:"updatedAt"`
+	Version   int64           `json:"version"`
 }
 
 // Clone returns a deep copy for the store's CAS retry callback.
@@ -39,6 +41,7 @@ func (e *Event) Clone() *Event {
 	clone := *e
 	clone.AssigneeIDs = slices.Clone(e.AssigneeIDs)
 	clone.Recurrence = e.Recurrence.Clone()
+	clone.Overrides = slices.Clone(e.Overrides)
 	clone.Reminders = slices.Clone(e.Reminders)
 	return &clone
 }
@@ -71,6 +74,7 @@ type EventRef struct {
 	AllDay      bool             `json:"d,omitempty"`
 	TimeZone    string           `json:"tz,omitempty"`
 	Recurrence  *EventRecurrence `json:"r,omitempty"`
+	Overrides   []EventOverride  `json:"x,omitempty"`
 	Reminders   []int            `json:"m,omitempty"`
 	CreatedAt   int64            `json:"k"`
 	UpdatedAt   int64            `json:"u"`
@@ -101,6 +105,7 @@ func (e *Event) Ref() EventRef {
 		AllDay:      e.AllDay,
 		TimeZone:    e.TimeZone,
 		Recurrence:  e.Recurrence.Clone(),
+		Overrides:   slices.Clone(e.Overrides),
 		Reminders:   slices.Clone(e.Reminders),
 		CreatedAt:   e.CreatedAt,
 		UpdatedAt:   e.UpdatedAt,
@@ -123,6 +128,7 @@ type EventSummary struct {
 	AllDay      bool             `json:"allDay,omitempty"`
 	TimeZone    string           `json:"timezone,omitempty"`
 	Recurrence  *EventRecurrence `json:"recurrence,omitempty"`
+	Overrides   []EventOverride  `json:"overrides,omitempty"`
 	Reminders   []int            `json:"reminders,omitempty"`
 	CreatedAt   int64            `json:"createdAt"`
 	UpdatedAt   int64            `json:"updatedAt"`
@@ -150,6 +156,7 @@ func (r EventRef) Summary() EventSummary {
 		AllDay:     r.AllDay,
 		TimeZone:   r.TimeZone,
 		Recurrence: r.Recurrence.Clone(),
+		Overrides:  slices.Clone(r.Overrides),
 		Reminders:  slices.Clone(r.Reminders),
 		CreatedAt:  r.CreatedAt,
 		UpdatedAt:  r.UpdatedAt,
@@ -173,27 +180,31 @@ type CreateEventInput struct {
 	Reminders   []int
 }
 
-// EventPatch is a partial event update. A nil pointer means "leave unchanged".
+// EventPatch is a partial event update. A nil pointer means "leave unchanged". When
+// OccurrenceStartAt is set the patch moves or cancels that single occurrence instead of the series.
 type EventPatch struct {
-	TeamID      *string
-	ChannelID   *string
-	Visibility  *string
-	Title       *string
-	Description *string
-	Location    *string
-	AssigneeIDs *[]string
-	StartAt     *int64
-	EndAt       *int64
-	AllDay      *bool
-	TimeZone    *string
-	Recurrence  *EventRecurrence
-	Reminders   *[]int
+	TeamID              *string
+	ChannelID           *string
+	Visibility          *string
+	Title               *string
+	Description         *string
+	Location            *string
+	AssigneeIDs         *[]string
+	StartAt             *int64
+	EndAt               *int64
+	AllDay              *bool
+	TimeZone            *string
+	Recurrence          *EventRecurrence
+	Reminders           *[]int
+	OccurrenceStartAt   *int64
+	OccurrenceCancelled *bool
 }
 
 // IsZero reports whether the patch changes nothing.
 func (p EventPatch) IsZero() bool {
 	return p.TeamID == nil && p.ChannelID == nil && p.Visibility == nil && p.Title == nil &&
-		p.Description == nil && p.Location == nil && p.AssigneeIDs == nil && p.StartAt == nil && p.EndAt == nil && p.AllDay == nil && p.TimeZone == nil && p.Recurrence == nil && p.Reminders == nil
+		p.Description == nil && p.Location == nil && p.AssigneeIDs == nil && p.StartAt == nil && p.EndAt == nil && p.AllDay == nil && p.TimeZone == nil && p.Recurrence == nil && p.Reminders == nil &&
+		p.OccurrenceStartAt == nil && p.OccurrenceCancelled == nil
 }
 
 // EventQuery is a validated event list query. Events are fetched for a time range.

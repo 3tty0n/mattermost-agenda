@@ -32,13 +32,17 @@ import './event_detail.css';
 
 type Props = {
     eventId: string;
+
+    // When the event was opened from one occurrence of a recurring series, the start the series
+    // would have given that occurrence; times and exports then reflect the occurrence.
+    occurrenceStartAt?: number;
     onClose: () => void;
     onEdit: () => void;
 };
 
 // EventDetail is the read-only view an event opens in. Editing is one click away (creator or admin
 // only), and the event can be copied into Google Calendar, Outlook or an .ics file.
-export default function EventDetail({eventId, onClose, onEdit}: Props) {
+export default function EventDetail({eventId, occurrenceStartAt, onClose, onEdit}: Props) {
     const intl = useIntl();
     const hour12 = useHour12();
     const currentUserId = useSelector(selectCurrentUserId);
@@ -61,17 +65,39 @@ export default function EventDetail({eventId, onClose, onEdit}: Props) {
     const location = event?.location?.trim();
     const locationUrl = httpUrl(location);
 
+    // Resolve the occurrence's effective times: an override may have moved it, and a slot without
+    // an override still starts where the series would place it.
+    const series = Boolean(event?.recurrence && event.recurrence.frequency !== 'none');
+    const occurrence = Boolean(occurrenceStartAt && series);
+    let cancelled = false;
+    let startAt = event?.startAt ?? 0;
+    let endAt = event?.endAt ?? 0;
+    if (event && occurrence && occurrenceStartAt) {
+        const override = (event.overrides ?? []).find((candidate) => candidate.originalStart === occurrenceStartAt);
+        if (override) {
+            cancelled = Boolean(override.cancelled);
+            startAt = override.startAt || startAt;
+            endAt = override.endAt || endAt;
+        } else {
+            startAt = occurrenceStartAt;
+            endAt = occurrenceStartAt + (event.endAt - event.startAt);
+        }
+    }
+
+    // Exports from an occurrence copy that occurrence only, not the whole series.
+    const exportEvent: Event | undefined = event && occurrence ? {...event, startAt, endAt, recurrence: undefined} : event;
+
     let when = '';
     if (event) {
         const zone = event.allDay ? 'UTC' : undefined;
-        const start = new Date(event.startAt);
-        const lastDay = new Date(event.allDay ? event.endAt - (24 * 60 * 60 * 1000) : event.endAt);
+        const start = new Date(startAt);
+        const lastDay = new Date(event.allDay ? endAt - (24 * 60 * 60 * 1000) : endAt);
         const day = (date: Date) => intl.formatDate(date, {timeZone: zone, weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'});
         const sameDay = day(start) === day(lastDay);
         if (event.allDay) {
             when = sameDay ? day(start) : `${day(start)} – ${day(lastDay)}`;
         } else {
-            when = sameDay ? `${day(start)}, ${formatEventTime(intl, event, hour12)}` : `${day(start)} ${intl.formatTime(start, {hour: 'numeric', minute: '2-digit', hour12})} – ${day(lastDay)} ${intl.formatTime(lastDay, {hour: 'numeric', minute: '2-digit', hour12})}`;
+            when = sameDay ? `${day(start)}, ${formatEventTime(intl, {...event, startAt, endAt}, hour12)}` : `${day(start)} ${intl.formatTime(start, {hour: 'numeric', minute: '2-digit', hour12})} – ${day(lastDay)} ${intl.formatTime(lastDay, {hour: 'numeric', minute: '2-digit', hour12})}`;
         }
     }
     const repeats = event?.recurrence && event.recurrence.frequency !== 'none';
@@ -133,6 +159,20 @@ export default function EventDetail({eventId, onClose, onEdit}: Props) {
                             />
                             <span>{when}</span>
                         </div>
+                        {occurrence && cancelled && (
+                            <div className='Tasks-EventDetail__row'>
+                                <Icon
+                                    size='16'
+                                    glyph={<CalendarOutlineIcon/>}
+                                />
+                                <span>
+                                    <FormattedMessage
+                                        id='tasks.event.occurrence_cancelled'
+                                        defaultMessage='This occurrence was removed from the series.'
+                                    />
+                                </span>
+                            </div>
+                        )}
                         {repeats && (
                             <div className='Tasks-EventDetail__row'>
                                 <Icon
@@ -191,7 +231,7 @@ export default function EventDetail({eventId, onClose, onEdit}: Props) {
                             <Button
                                 emphasis='tertiary'
                                 size='small'
-                                onClick={() => window.open(googleCalendarUrl(event), '_blank', 'noopener,noreferrer')}
+                                onClick={() => exportEvent && window.open(googleCalendarUrl(exportEvent), '_blank', 'noopener,noreferrer')}
                             >
                                 <FormattedMessage
                                     id='tasks.event.add_google'
@@ -201,7 +241,7 @@ export default function EventDetail({eventId, onClose, onEdit}: Props) {
                             <Button
                                 emphasis='tertiary'
                                 size='small'
-                                onClick={() => window.open(outlookCalendarUrl(event), '_blank', 'noopener,noreferrer')}
+                                onClick={() => exportEvent && window.open(outlookCalendarUrl(exportEvent), '_blank', 'noopener,noreferrer')}
                             >
                                 <FormattedMessage
                                     id='tasks.event.add_outlook'
@@ -211,7 +251,7 @@ export default function EventDetail({eventId, onClose, onEdit}: Props) {
                             <Button
                                 emphasis='tertiary'
                                 size='small'
-                                onClick={() => downloadIcs(event)}
+                                onClick={() => exportEvent && downloadIcs(exportEvent)}
                             >
                                 <FormattedMessage
                                     id='tasks.event.add_ics'

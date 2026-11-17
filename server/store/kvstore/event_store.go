@@ -338,6 +338,7 @@ func eventRefFieldsEqual(a, b *taskmodel.EventRef) bool {
 		a.AllDay == b.AllDay &&
 		a.TimeZone == b.TimeZone &&
 		eventRecurrenceEqual(a.Recurrence, b.Recurrence) &&
+		taskmodel.EventOverridesEqual(a.Overrides, b.Overrides) &&
 		slices.Equal(a.Reminders, b.Reminders) &&
 		a.CreatedAt == b.CreatedAt
 }

@@ -75,6 +75,44 @@ describe('eventOccurrencesForDays', () => {
         expect(occurrences.map((occurrence) => occurrence.dateKey)).toEqual(['2026-01-05', '2026-01-19']);
     });
 
+    it('moves a single occurrence to a day the series would not match', () => {
+        const slot = new Date(2026, 0, 12, 9, 0).getTime(); // Monday
+        const recurring = event({
+            recurrence: {frequency: 'weekly', interval: 1, weekdays: [1], until: '2026-01-19'},
+            overrides: [{
+                originalStart: slot,
+                startAt: new Date(2026, 0, 13, 15, 0).getTime(), // Tuesday
+                endAt: new Date(2026, 0, 13, 16, 0).getTime(),
+            }],
+        });
+        const occurrences = eventOccurrencesForDays(recurring, days('2026-01-11', '2026-01-16'));
+        expect(occurrences.map((occurrence) => occurrence.dateKey)).toEqual(['2026-01-13']);
+        expect(occurrences[0].startAt).toBe(new Date(2026, 0, 13, 15, 0).getTime());
+        expect(occurrences[0].originalStart).toBe(slot);
+    });
+
+    it('drops a cancelled occurrence from the series', () => {
+        const recurring = event({
+            recurrence: {frequency: 'daily', interval: 1, until: '2026-01-08'},
+            overrides: [{originalStart: new Date(2026, 0, 6, 9, 0).getTime(), startAt: 0, endAt: 0, cancelled: true}],
+        });
+        const occurrences = eventOccurrencesForDays(recurring, days('2026-01-05', '2026-01-08'));
+        expect(occurrences.map((occurrence) => occurrence.dateKey)).toEqual(['2026-01-05', '2026-01-07', '2026-01-08']);
+    });
+
+    it('shows an occurrence moved into the window from a slot outside it', () => {
+        const recurring = event({
+            recurrence: {frequency: 'weekly', interval: 1, weekdays: [1], until: '2026-01-30'},
+            overrides: [{
+                originalStart: new Date(2026, 0, 26, 9, 0).getTime(), // Monday, three weeks out
+                startAt: new Date(2026, 0, 7, 9, 0).getTime(), // moved into the visible window
+                endAt: new Date(2026, 0, 7, 10, 0).getTime(),
+            }],
+        });
+        const occurrences = eventOccurrencesForDays(recurring, days('2026-01-05', '2026-01-10'));
+        expect(occurrences.map((occurrence) => occurrence.dateKey)).toEqual(['2026-01-05', '2026-01-07']);
+    });
+
     it('sorts all-day events before timed events', () => {
         const allDay = event({id: 'all-day', allDay: true, startAt: Date.UTC(2026, 0, 5), endAt: Date.UTC(2026, 0, 6)});
         const timed = event({id: 'timed'});

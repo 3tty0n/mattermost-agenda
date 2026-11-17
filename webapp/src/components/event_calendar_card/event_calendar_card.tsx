@@ -20,7 +20,11 @@ import './event_calendar_card.css';
 type Props = {
     event: EventSummary;
     profiles: Record<string, Profile>;
-    onOpen: (eventID: string) => void;
+
+    // When the card shows one occurrence of a recurring series, the start the series would have
+    // given it; the detail view needs it to show and edit the occurrence, not the series.
+    occurrenceStartAt?: number;
+    onOpen: (eventID: string, occurrenceStartAt?: number) => void;
 };
 
 // Up to nine participants are shown; with ten or more the first nine are followed by an ellipsis.
@@ -29,7 +33,7 @@ const MAX_AVATARS = 9;
 // EventCalendarCard is intentionally different from TaskCalendarCard: an accent bar and a time
 // range, no checkbox or priority. Participants sit on their own row (or, when the card is wide, at
 // the right end of a single row) so they never take width from the time range.
-export default function EventCalendarCard({event, profiles, onOpen}: Props) {
+export default function EventCalendarCard({event, occurrenceStartAt, profiles, onOpen}: Props) {
     const intl = useIntl();
     const hour12 = useHour12();
     const visibleAssignees = event.assigneeIds.slice(0, MAX_AVATARS);
@@ -40,7 +44,7 @@ export default function EventCalendarCard({event, profiles, onOpen}: Props) {
     return (
         <article
             className='Tasks-EventCard'
-            onClick={() => onOpen(event.id)}
+            onClick={() => onOpen(event.id, occurrenceStartAt)}
         >
             <div className='Tasks-EventCard__body'>
                 <div className='Tasks-EventCard__meta'>
@@ -55,7 +59,7 @@ export default function EventCalendarCard({event, profiles, onOpen}: Props) {
                     className='Tasks-EventCard__title'
                     onClick={(clickEvent) => {
                         clickEvent.stopPropagation();
-                        onOpen(event.id);
+                        onOpen(event.id, occurrenceStartAt);
                     }}
                 >
                     {event.title}

@@ -471,4 +471,88 @@ describe('EventEditor', () => {
 
         await waitFor(() => expect(updateEventMock).toHaveBeenCalledWith('event-1', expect.objectContaining({reminders: []})));
     });
+
+    describe('with an occurrence of a recurring series', () => {
+        const recurringSaved: Event = {
+            ...savedEvent,
+            recurrence: {frequency: 'weekly', interval: 1, weekdays: [1]},
+        };
+        const nextOccurrence = new Date(2026, 0, 12, 9, 0).getTime(); // the next Monday slot
+
+        it('edits a single occurrence without re-anchoring the series', async () => {
+            const user = userEvent.setup();
+            const onSaved = jest.fn();
+            getEventMock.mockResolvedValue(recurringSaved);
+            updateEventMock.mockResolvedValue(recurringSaved);
+            renderWithStore(
+                <EventEditor
+                    eventId='event-1'
+                    occurrenceStartAt={nextOccurrence}
+                    onClose={jest.fn()}
+                    onSaved={onSaved}
+                />,
+            );
+
+            expect(await screen.findByRole('group', {name: 'Apply changes to'})).toBeVisible();
+            expect(screen.getByRole('button', {name: 'This event only'})).toHaveAttribute('aria-pressed', 'true');
+            expect(screen.getByLabelText('Title')).toBeDisabled();
+
+            await user.click(screen.getByRole('button', {name: 'Save'}));
+            await waitFor(() => expect(updateEventMock).toHaveBeenCalledWith('event-1', {
+                startAt: nextOccurrence,
+                endAt: nextOccurrence + 3600000,
+                occurrenceStartAt: nextOccurrence,
+            }));
+            expect(onSaved).toHaveBeenCalledWith(recurringSaved);
+        });
+
+        it('applies series-wide edits after switching the scope to all events', async () => {
+            const user = userEvent.setup();
+            getEventMock.mockResolvedValue(recurringSaved);
+            renderWithStore(
+                <EventEditor
+                    eventId='event-1'
+                    occurrenceStartAt={nextOccurrence}
+                    onClose={jest.fn()}
+                    onSaved={jest.fn()}
+                />,
+            );
+
+            await screen.findByRole('group', {name: 'Apply changes to'});
+            await user.click(screen.getByRole('button', {name: 'All events'}));
+            expect(screen.getByLabelText('Title')).toBeEnabled();
+
+            await user.click(screen.getByRole('button', {name: 'Save'}));
+            await waitFor(() => expect(updateEventMock).toHaveBeenCalledWith('event-1', expect.objectContaining({
+                title: 'Sprint planning',
+                startAt: start,
+                endAt: end,
+            })));
+        });
+
+        it('deletes a single occurrence by cancelling it', async () => {
+            const user = userEvent.setup();
+            const onDeleted = jest.fn();
+            getEventMock.mockResolvedValue(recurringSaved);
+            renderWithStore(
+                <EventEditor
+                    eventId='event-1'
+                    occurrenceStartAt={nextOccurrence}
+                    onClose={jest.fn()}
+                    onSaved={jest.fn()}
+                    onDeleted={onDeleted}
+                />,
+            );
+
+            await screen.findByRole('group', {name: 'Apply changes to'});
+            await user.click(screen.getByRole('button', {name: 'Delete this event'}));
+            await user.click(screen.getByRole('button', {name: 'Confirm delete'}));
+            await waitFor(() => expect(updateEventMock).toHaveBeenCalledWith('event-1', {
+                occurrenceStartAt: nextOccurrence,
+                occurrenceCancelled: true,
+            }));
+            expect(deleteEventMock).not.toHaveBeenCalled();
+            expect(onDeleted).toHaveBeenCalled();
+        });
+    });
 });

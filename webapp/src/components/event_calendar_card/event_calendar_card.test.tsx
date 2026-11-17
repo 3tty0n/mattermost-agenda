@@ -27,9 +27,10 @@ const event = (location?: string): EventSummary => ({
     version: 1,
 });
 
-const renderCard = (value?: string, onOpen = jest.fn()) => renderWithStore(
+const renderCard = (value?: string, onOpen = jest.fn(), occurrenceStartAt?: number) => renderWithStore(
     <EventCalendarCard
         event={event(value)}
+        occurrenceStartAt={occurrenceStartAt}
         profiles={{}}
         onOpen={onOpen}
     />,
@@ -57,5 +58,12 @@ describe('EventCalendarCard location', () => {
         renderCard('ftp://files.example.com/a');
         expect(screen.getByText('ftp://files.example.com/a')).toBeVisible();
         expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    });
+
+    it('opens the occurrence the card belongs to', async () => {
+        const onOpen = jest.fn();
+        renderCard(undefined, onOpen, 1234);
+        await userEvent.click(screen.getByRole('button', {name: 'Sync'}));
+        expect(onOpen).toHaveBeenCalledWith('e1', 1234);
     });
 });

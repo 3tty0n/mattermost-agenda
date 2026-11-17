@@ -42,6 +42,51 @@ describe('event export', () => {
         expect(ics).toContain('DTSTART;TZID=Asia/Tokyo:20260105T090000');
     });
 
+    test('overrides become EXDATEs and moved VEVENTs with a RECURRENCE-ID', () => {
+        const originalStart = Date.UTC(2026, 0, 12, 0, 0);
+        const event = {
+            ...base,
+            timezone: 'UTC',
+            recurrence: {frequency: 'weekly' as const, interval: 1, weekdays: [1]},
+            overrides: [
+                {originalStart, startAt: 0, endAt: 0, cancelled: true},
+                {originalStart: Date.UTC(2026, 0, 19, 0, 0), startAt: Date.UTC(2026, 0, 20, 15, 0), endAt: Date.UTC(2026, 0, 20, 16, 0)},
+            ],
+        };
+        const ics = buildIcs(event, Date.UTC(2026, 0, 1));
+
+        // The series keeps one VEVENT with the rule and an EXDATE per cancelled occurrence.
+        expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(2);
+        expect(ics).toContain('RRULE:FREQ=WEEKLY;BYDAY=MO');
+        expect(ics).toContain('EXDATE;TZID=UTC:20260112T000000');
+        expect(ics).not.toContain('EXDATE;TZID=UTC:20260119');
+
+        // The moved occurrence shares the UID but replaces the slot it came from.
+        expect(ics).toContain('RECURRENCE-ID;TZID=UTC:20260119T000000');
+        expect(ics).toContain('DTSTART;TZID=UTC:20260120T150000');
+        expect(ics.match(/UID:ev1@mattermost-tasks/g)).toHaveLength(2);
+    });
+
+    test('all-day overrides use date values', () => {
+        const originalStart = Date.UTC(2026, 0, 12);
+        const event = {
+            ...base,
+            allDay: true,
+            startAt: Date.UTC(2026, 0, 5),
+            endAt: Date.UTC(2026, 0, 6),
+            timezone: 'UTC',
+            recurrence: {frequency: 'weekly' as const, interval: 1, weekdays: [1]},
+            overrides: [
+                {originalStart, startAt: 0, endAt: 0, cancelled: true},
+                {originalStart: Date.UTC(2026, 0, 19), startAt: Date.UTC(2026, 0, 20), endAt: Date.UTC(2026, 0, 21)},
+            ],
+        };
+        const ics = buildIcs(event, Date.UTC(2026, 0, 1));
+        expect(ics).toContain('EXDATE;VALUE=DATE:20260112');
+        expect(ics).toContain('RECURRENCE-ID;VALUE=DATE:20260119');
+        expect(ics).toContain('DTSTART;VALUE=DATE:20260120');
+    });
+
     test('all-day event uses dates', () => {
         const event = {...base, allDay: true, startAt: Date.UTC(2026, 0, 5), endAt: Date.UTC(2026, 0, 6)};
         expect(buildIcs(event)).toContain('DTSTART;VALUE=DATE:20260105');

@@ -106,30 +106,56 @@ function fold(line: string): string {
 export function buildIcs(event: Event, now = Date.now()): string {
     const rule = recurrenceRule(event);
     const zone = eventZone(event);
-    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//mattermost-tasks//EN', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT'];
-    lines.push(`UID:${event.id}@mattermost-tasks`, `DTSTAMP:${utcStamp(now)}`);
-    if (event.allDay) {
-        lines.push(`DTSTART;VALUE=DATE:${utcDate(event.startAt)}`, `DTEND;VALUE=DATE:${utcDate(event.endAt)}`);
-    } else if (rule) {
-        // Anchored to local wall time so weekday rules and daylight saving behave.
-        lines.push(`DTSTART;TZID=${zone}:${wallStamp(event.startAt, zone)}`, `DTEND;TZID=${zone}:${wallStamp(event.endAt, zone)}`);
-    } else {
-        lines.push(`DTSTART:${utcStamp(event.startAt)}`, `DTEND:${utcStamp(event.endAt)}`);
-    }
-    if (rule) {
-        lines.push(`RRULE:${rule}`);
-    }
-    lines.push(`SUMMARY:${escapeText(event.title)}`);
-    if (event.description?.trim()) {
-        lines.push(`DESCRIPTION:${escapeText(event.description)}`);
-    }
-    if (event.location?.trim()) {
-        lines.push(`LOCATION:${escapeText(event.location)}`);
-    }
-    for (const minutes of event.reminders ?? []) {
-        lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${escapeText(event.title)}`, `TRIGGER:${reminderTrigger(minutes)}`, 'END:VALARM');
-    }
-    lines.push('END:VEVENT', 'END:VCALENDAR');
+    const overrides = event.overrides ?? [];
+    const cancelled = overrides.filter((override) => override.cancelled && override.originalStart > 0);
+    const moved = overrides.filter((override) => !override.cancelled && override.startAt > 0);
+    const stampPair = (startAt: number, endAt: number): string[] => {
+        if (event.allDay) {
+            return [`DTSTART;VALUE=DATE:${utcDate(startAt)}`, `DTEND;VALUE=DATE:${utcDate(endAt)}`];
+        }
+        if (rule) {
+            // Anchored to local wall time so weekday rules and daylight saving behave.
+            return [`DTSTART;TZID=${zone}:${wallStamp(startAt, zone)}`, `DTEND;TZID=${zone}:${wallStamp(endAt, zone)}`];
+        }
+        return [`DTSTART:${utcStamp(startAt)}`, `DTEND:${utcStamp(endAt)}`];
+    };
+
+    // A moved occurrence keeps the series UID but carries the RECURRENCE-ID of the slot it replaces.
+    const recurrenceId = (originalStart: number): string => (event.allDay ? `RECURRENCE-ID;VALUE=DATE:${utcDate(originalStart)}` : `RECURRENCE-ID;TZID=${zone}:${wallStamp(originalStart, zone)}`);
+    const eventBody = (startAt: number, endAt: number, occurrenceId?: number): string[] => {
+        const lines = ['BEGIN:VEVENT', `UID:${event.id}@mattermost-tasks`, `DTSTAMP:${utcStamp(now)}`];
+        if (occurrenceId) {
+            lines.push(recurrenceId(occurrenceId));
+        }
+        lines.push(...stampPair(startAt, endAt));
+        if (rule && !occurrenceId) {
+            lines.push(`RRULE:${rule}`);
+            for (const override of cancelled) {
+                lines.push(event.allDay ? `EXDATE;VALUE=DATE:${utcDate(override.originalStart)}` : `EXDATE;TZID=${zone}:${wallStamp(override.originalStart, zone)}`);
+            }
+        }
+        lines.push(`SUMMARY:${escapeText(event.title)}`);
+        if (event.description?.trim()) {
+            lines.push(`DESCRIPTION:${escapeText(event.description)}`);
+        }
+        if (event.location?.trim()) {
+            lines.push(`LOCATION:${escapeText(event.location)}`);
+        }
+        for (const minutes of event.reminders ?? []) {
+            lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${escapeText(event.title)}`, `TRIGGER:${reminderTrigger(minutes)}`, 'END:VALARM');
+        }
+        lines.push('END:VEVENT');
+        return lines;
+    };
+    const lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//mattermost-tasks//EN',
+        'CALSCALE:GREGORIAN',
+        ...eventBody(event.startAt, event.endAt),
+        ...moved.flatMap((override) => eventBody(override.startAt, override.endAt, override.originalStart)),
+        'END:VCALENDAR',
+    ];
     return lines.map(fold).join('\r\n') + '\r\n';
 }
 

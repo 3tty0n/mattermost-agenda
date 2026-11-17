@@ -12,6 +12,9 @@ export type CalendarEventOccurrence = {
     startAt: number;
     endAt: number;
     dateKey: string;
+
+    // For an overridden occurrence, the start the series would have given it.
+    originalStart?: number;
 };
 
 function utcDateKey(value: number): string {
@@ -100,11 +103,12 @@ function occurrenceStart(event: EventSummary, date: CivilDate, anchorClock: {hou
 
 // recurringEvents expands a series into concrete intervals around the visible days. The calendar
 // range covers the viewer's local days plus a two-day margin so events in another timezone still
-// map to the right local day.
-function recurringEvents(event: EventSummary, days: Date[]): EventSummary[] {
+// map to the right local day. Overrides move or cancel single occurrences; an occurrence moved into
+// the window from a slot outside it is emitted at its new time.
+function recurringEvents(event: EventSummary, days: Date[]): Array<{event: EventSummary; originalStart?: number}> {
     const recurrence = event.recurrence;
     if (!recurrence || recurrence.frequency === 'none' || days.length === 0) {
-        return [event];
+        return [{event}];
     }
     const timeZone = event.timezone || 'UTC';
     const anchorParts = event.allDay ? (() => {
@@ -121,7 +125,9 @@ function recurringEvents(event: EventSummary, days: Date[]): EventSummary[] {
     const to = addDays(last, 2);
     const duration = event.endAt - event.startAt;
     const until = recurrence.until;
-    const events: EventSummary[] = [];
+    const overrides = new Map((event.overrides ?? []).map((override) => [override.originalStart, override]));
+    const handled = new Set<number>();
+    const occurrences: Array<{event: EventSummary; originalStart?: number}> = [];
     for (let date = from; compareDate(date, to) <= 0; date = addDays(date, 1)) {
         if (compareDate(date, anchor) < 0) {
             continue;
@@ -136,9 +142,40 @@ function recurringEvents(event: EventSummary, days: Date[]): EventSummary[] {
         if (!startAt) {
             continue;
         }
-        events.push({...event, startAt, endAt: startAt + duration});
+        const override = overrides.get(startAt);
+        if (override) {
+            handled.add(startAt);
+            if (override.cancelled) {
+                continue;
+            }
+            occurrences.push({event: {...event, startAt: override.startAt, endAt: override.endAt}, originalStart: startAt});
+            continue;
+        }
+        occurrences.push({event: {...event, startAt, endAt: startAt + duration}});
     }
-    return events;
+
+    // Occurrences moved into the visible window from slots the day scan cannot see.
+    const civilOf = (value: number): CivilDate | undefined => {
+        if (!value) {
+            return undefined;
+        }
+        const parts = event.allDay ? (() => {
+            const date = new Date(value);
+            return {year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate()};
+        })() : epochToZonedParts(value, timeZone);
+        return {year: parts.year, month: parts.month, day: parts.day};
+    };
+    for (const override of event.overrides ?? []) {
+        if (override.cancelled || handled.has(override.originalStart)) {
+            continue;
+        }
+        const date = civilOf(override.startAt);
+        if (!date || compareDate(date, from) < 0 || compareDate(date, to) > 0) {
+            continue;
+        }
+        occurrences.push({event: {...event, startAt: override.startAt, endAt: override.endAt}, originalStart: override.originalStart});
+    }
+    return occurrences;
 }
 
 // eventOccurrencesForDays puts an event (or each occurrence of a series) on every visible day it
@@ -150,18 +187,25 @@ export function eventOccurrencesForDays(event: EventSummary, days: Date[]): Cale
     }
     const occurrences: CalendarEventOccurrence[] = [];
     for (const concrete of recurringEvents(event, days)) {
-        if (concrete.endAt <= concrete.startAt) {
+        const series = concrete.event;
+        if (series.endAt <= series.startAt) {
             continue;
         }
-        const startKey = concrete.allDay ? utcDateKey(concrete.startAt) : localDateKey(new Date(concrete.startAt));
-        const lastMoment = concrete.endAt - 1;
-        const endKey = concrete.allDay ? utcDateKey(lastMoment) : localDateKey(new Date(lastMoment));
+        const startKey = series.allDay ? utcDateKey(series.startAt) : localDateKey(new Date(series.startAt));
+        const lastMoment = series.endAt - 1;
+        const endKey = series.allDay ? utcDateKey(lastMoment) : localDateKey(new Date(lastMoment));
         for (const day of days) {
             const key = localDateKey(day);
             if (key < startKey || key > endKey) {
                 continue;
             }
-            occurrences.push({event: concrete, startAt: concrete.startAt, endAt: concrete.endAt, dateKey: key});
+            occurrences.push({
+                event: series,
+                startAt: series.startAt,
+                endAt: series.endAt,
+                dateKey: key,
+                originalStart: concrete.originalStart,
+            });
         }
     }
     return occurrences;

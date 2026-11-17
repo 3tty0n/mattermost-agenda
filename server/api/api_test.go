@@ -494,6 +494,32 @@ func TestEventAPILifecycle(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	assert.Equal(t, "Sprint planning v2", decodeResponse[taskmodel.Event](t, w).Title)
 
+	// Moving one occurrence (Monday Jan 5, 00:00) leaves the series anchor untouched.
+	occurrenceStart := start + 4*86400000
+	movedStart := start + 5*86400000 + 9*3600000
+	movedEnd := movedStart + 3600000
+	body = `{"occurrenceStartAt":` + strconv.FormatInt(occurrenceStart, 10) + `,"startAt":` + strconv.FormatInt(movedStart, 10) + `,"endAt":` + strconv.FormatInt(movedEnd, 10) + `}`
+	w = env.serve(http.MethodPost, "/api/v1/events/"+created.ID, body, creatorID)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	updated := decodeResponse[taskmodel.Event](t, w)
+	assert.Equal(t, start, updated.StartAt)
+	require.Len(t, updated.Overrides, 1)
+	assert.Equal(t, occurrenceStart, updated.Overrides[0].OriginalStart)
+
+	// Cancelling the same occurrence keeps one override entry per occurrence.
+	body = `{"occurrenceStartAt":` + strconv.FormatInt(occurrenceStart, 10) + `,"occurrenceCancelled":true}`
+	w = env.serve(http.MethodPost, "/api/v1/events/"+created.ID, body, creatorID)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.Len(t, decodeResponse[taskmodel.Event](t, w).Overrides, 1)
+
+	// Users who cannot view the event get the same answer as for a missing event, and mixing an
+	// occurrence patch with shared-field patches is rejected.
+	w = env.serve(http.MethodPost, "/api/v1/events/"+created.ID, body, strangerID)
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	body = `{"occurrenceStartAt":` + strconv.FormatInt(occurrenceStart, 10) + `,"title":"nope"}`
+	w = env.serve(http.MethodPost, "/api/v1/events/"+created.ID, body, creatorID)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
 	w = env.serve(http.MethodDelete, "/api/v1/events/"+created.ID, "", creatorID)
 	require.Equal(t, http.StatusNoContent, w.Code, w.Body.String())
 	w = env.serve(http.MethodGet, "/api/v1/events/"+created.ID, "", creatorID)

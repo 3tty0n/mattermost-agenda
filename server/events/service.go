@@ -305,6 +305,10 @@ func (s *EventService) Update(c *plugin.Context, path, actorID, eventID string, 
 			return nil, model.ErrForbidden
 		}
 
+		if patch.OccurrenceStartAt != nil {
+			return s.applyOccurrencePatch(current, patch)
+		}
+
 		oldVisibility := current.EffectiveVisibility()
 		newVisibility := oldVisibility
 		if patch.Visibility != nil {
@@ -437,6 +441,10 @@ func (s *EventService) Update(c *plugin.Context, path, actorID, eventID string, 
 			}
 			current.Recurrence = recurrence
 		}
+		if (patch.StartAt != nil || patch.EndAt != nil || patch.TimeZone != nil || patch.Recurrence != nil || patch.AllDay != nil) && len(current.Overrides) > 0 {
+			// Re-anchoring the series can invalidate the slots overrides point at; drop those.
+			current.Overrides = current.PruneEventOverrides()
+		}
 		return current, nil
 	})
 	if err != nil {
@@ -448,6 +456,34 @@ func (s *EventService) Update(c *plugin.Context, path, actorID, eventID string, 
 	s.remind(next)
 	s.publish("updated", next)
 	return next, nil
+}
+
+// applyOccurrencePatch moves or cancels one occurrence of a recurring series. Only the
+// occurrence's times may change: title, assignees and the other shared fields stay with the series,
+// so a patch that touches them is rejected instead of being silently applied to the whole series.
+func (s *EventService) applyOccurrencePatch(current *model.Event, patch model.EventPatch) (*model.Event, error) {
+	if patch.TeamID != nil || patch.ChannelID != nil || patch.Visibility != nil || patch.Title != nil ||
+		patch.Description != nil || patch.Location != nil || patch.AssigneeIDs != nil ||
+		patch.AllDay != nil || patch.TimeZone != nil || patch.Recurrence != nil || patch.Reminders != nil {
+		return nil, fmt.Errorf("%w: a single occurrence can only be moved or cancelled", model.ErrInvalid)
+	}
+	cancelled := patch.OccurrenceCancelled != nil && *patch.OccurrenceCancelled
+	if cancelled && (patch.StartAt != nil || patch.EndAt != nil) {
+		return nil, fmt.Errorf("%w: a cancelled occurrence cannot also be moved", model.ErrInvalid)
+	}
+	if !cancelled && (patch.StartAt == nil || patch.EndAt == nil) {
+		return nil, fmt.Errorf("%w: moving an occurrence requires a start and an end", model.ErrInvalid)
+	}
+	override := model.EventOverride{Cancelled: cancelled}
+	if !cancelled {
+		override.StartAt, override.EndAt = *patch.StartAt, *patch.EndAt
+	}
+	overrides, err := current.NormalizeEventOverride(*patch.OccurrenceStartAt, override)
+	if err != nil {
+		return nil, err
+	}
+	current.Overrides = overrides
+	return current, nil
 }
 
 // Delete removes an event. Only its creator or an administrator may do so.

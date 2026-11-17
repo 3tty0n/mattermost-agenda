@@ -56,6 +56,10 @@ export type EventEditorDefaults = {
 
 type Props = {
     eventId?: string;
+
+    // When editing one occurrence of a recurring series, the start the series would have given it;
+    // the editor then offers "this event only" vs "all events" and overrides the occurrence.
+    occurrenceStartAt?: number;
     defaults?: EventEditorDefaults;
     onClose: () => void;
     onSaved: (event: Event) => void;
@@ -72,7 +76,7 @@ function defaultStartAt(): number {
     return date.getTime();
 }
 
-export default function EventEditor({eventId, defaults, onClose, onSaved, onDeleted, defaultDurationMinutes = FALLBACK_EVENT_DURATION_MINUTES}: Props) {
+export default function EventEditor({eventId, occurrenceStartAt, defaults, onClose, onSaved, onDeleted, defaultDurationMinutes = FALLBACK_EVENT_DURATION_MINUTES}: Props) {
     const intl = useIntl();
     const currentTeam = useSelector(selectCurrentTeam);
     const myTeams = useSelector(selectMyTeams);
@@ -120,6 +124,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
         }
     });
     const [openProperty, setOpenProperty] = useState<'timezone'|'scope'|'repeat'>();
+    const [editScope, setEditScope] = useState<'occurrence'|'series'>(occurrenceStartAt ? 'occurrence' : 'series');
     const [repeatMode, setRepeatMode] = useState<'never'|'daily'|'weekdays'|'weekly'|'custom'>('never');
     const [repeatWeekdays, setRepeatWeekdays] = useState<number[]>([]);
     const [repeatInterval, setRepeatInterval] = useState(1);
@@ -142,17 +147,33 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                 setPreview(Boolean(loaded.description?.trim()));
                 setLocation(loaded.location ?? '');
                 setAllDay(Boolean(loaded.allDay));
-                setEndPinned(Boolean(loaded.allDay) && loaded.endAt - loaded.startAt > DAY_IN_MS);
+
+                // When editing one occurrence, the inputs show that occurrence's effective times,
+                // not the series anchor.
+                const recurring = Boolean(loaded.recurrence && loaded.recurrence.frequency !== 'none');
+                let displayStart = loaded.startAt;
+                let displayEnd = loaded.endAt;
+                if (occurrenceStartAt && recurring) {
+                    const override = (loaded.overrides ?? []).find((candidate) => candidate.originalStart === occurrenceStartAt);
+                    if (override && !override.cancelled) {
+                        displayStart = override.startAt;
+                        displayEnd = override.endAt;
+                    } else {
+                        displayStart = occurrenceStartAt;
+                        displayEnd = occurrenceStartAt + (loaded.endAt - loaded.startAt);
+                    }
+                }
+                setEndPinned(Boolean(loaded.allDay) && displayEnd - displayStart > DAY_IN_MS);
                 const loadedZone = loaded.timezone || machineTimeZone();
-                const startParts = epochToZonedParts(loaded.startAt, loadedZone);
-                const endDateParts = epochToZonedParts(loaded.allDay ? loaded.endAt - DAY_IN_MS : loaded.endAt, loadedZone);
-                const endClockParts = epochToZonedParts(loaded.endAt, loadedZone);
+                const startParts = epochToZonedParts(displayStart, loadedZone);
+                const endDateParts = epochToZonedParts(loaded.allDay ? displayEnd - DAY_IN_MS : displayEnd, loadedZone);
+                const endClockParts = epochToZonedParts(displayEnd, loadedZone);
                 setTimeZone(loadedZone);
-                setStartDate(loaded.allDay ? toDateInput(loaded.startAt, false).replace(/-/g, '/') : formatDateInput({year: startParts.year, month: startParts.month, day: startParts.day}));
-                setEndDate(loaded.allDay ? toDateInput(loaded.endAt - DAY_IN_MS, false).replace(/-/g, '/') : formatDateInput({year: endDateParts.year, month: endDateParts.month, day: endDateParts.day}));
+                setStartDate(loaded.allDay ? toDateInput(displayStart, false).replace(/-/g, '/') : formatDateInput({year: startParts.year, month: startParts.month, day: startParts.day}));
+                setEndDate(loaded.allDay ? toDateInput(displayEnd - DAY_IN_MS, false).replace(/-/g, '/') : formatDateInput({year: endDateParts.year, month: endDateParts.month, day: endDateParts.day}));
                 if (loaded.allDay) {
-                    const utcStart = new Date(loaded.startAt);
-                    const utcEnd = new Date(loaded.endAt);
+                    const utcStart = new Date(displayStart);
+                    const utcEnd = new Date(displayEnd);
                     setStartTime(formatTimeInput(utcStart.getUTCHours(), utcStart.getUTCMinutes(), Boolean(hour12)));
                     setEndTime(formatTimeInput(utcEnd.getUTCHours(), utcEnd.getUTCMinutes(), Boolean(hour12)));
                 } else {
@@ -210,11 +231,29 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
             },
         );
         return () => controller.abort();
-    }, [eventId]);
+    }, [eventId, occurrenceStartAt]);
 
     const canModify = !eventId || Boolean(event && (event.creatorId === currentUserId || isAdmin));
     useFocusAfterOpen(titleRef, !loading && canModify);
     const canDelete = Boolean(event && (event.creatorId === currentUserId || isAdmin));
+
+    const recurring = Boolean(event?.recurrence && event.recurrence.frequency !== 'none');
+    const occurrenceEdit = Boolean(occurrenceStartAt && recurring && event);
+    const occurrenceTimes = () => {
+        if (!event || !occurrenceStartAt) {
+            return undefined;
+        }
+        const override = (event.overrides ?? []).find((candidate) => candidate.originalStart === occurrenceStartAt);
+        if (override && !override.cancelled) {
+            return {startAt: override.startAt, endAt: override.endAt};
+        }
+        return {startAt: occurrenceStartAt, endAt: occurrenceStartAt + (event.endAt - event.startAt)};
+    };
+
+    // In "this event only" mode the shared fields are disabled: the server rejects anything but a
+    // time change on a single occurrence.
+    const timeOnly = occurrenceEdit && editScope === 'occurrence';
+    const fieldEditable = canModify && !timeOnly;
     const teamOptions = myTeams.map((memberTeam) => ({value: memberTeam.id, label: memberTeam.display_name}));
     if (teamID && !teamOptions.some((option) => option.value === teamID)) {
         teamOptions.push({value: teamID, label: currentTeam?.id === teamID ? currentTeam.display_name : teamID});
@@ -374,6 +413,42 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
         setEndDate(formatDateInput({year: endDateParts.year, month: endDateParts.month, day: endDateParts.day}));
         setStartTime(formatTimeInput(startParts.hour, startParts.minute, Boolean(hour12)));
         setEndTime(formatTimeInput(endClockParts.hour, endClockParts.minute, Boolean(hour12)));
+    };
+
+    // applyInstants rewrites the date and time inputs from absolute instants, as the loader does.
+    const applyInstants = (startAt: number, endAt: number, allDayEvent: boolean) => {
+        const zone = isValidTimeZone(timeZone) ? timeZone : machineTimeZone();
+        const startParts = epochToZonedParts(startAt, zone);
+        const endDateParts = epochToZonedParts(allDayEvent ? endAt - DAY_IN_MS : endAt, zone);
+        const endClockParts = epochToZonedParts(endAt, zone);
+        setStartDate(allDayEvent ? toDateInput(startAt, false).replace(/-/g, '/') : formatDateInput({year: startParts.year, month: startParts.month, day: startParts.day}));
+        setEndDate(allDayEvent ? toDateInput(endAt - DAY_IN_MS, false).replace(/-/g, '/') : formatDateInput({year: endDateParts.year, month: endDateParts.month, day: endDateParts.day}));
+        if (allDayEvent) {
+            const utcStart = new Date(startAt);
+            const utcEnd = new Date(endAt);
+            setStartTime(formatTimeInput(utcStart.getUTCHours(), utcStart.getUTCMinutes(), Boolean(hour12)));
+            setEndTime(formatTimeInput(utcEnd.getUTCHours(), utcEnd.getUTCMinutes(), Boolean(hour12)));
+        } else {
+            setStartTime(formatTimeInput(startParts.hour, startParts.minute, Boolean(hour12)));
+            setEndTime(formatTimeInput(endClockParts.hour, endClockParts.minute, Boolean(hour12)));
+        }
+    };
+
+    // Switching scope rewrites the times: "all events" edits the series anchor, "this event only"
+    // edits the occurrence the user clicked.
+    const changeEditScope = (next: 'occurrence'|'series') => {
+        if (next === editScope || !event) {
+            return;
+        }
+        setEditScope(next);
+        if (next === 'series') {
+            applyInstants(event.startAt, event.endAt, Boolean(event.allDay));
+            return;
+        }
+        const times = occurrenceTimes();
+        if (times) {
+            applyInstants(times.startAt, times.endAt, Boolean(event.allDay));
+        }
     };
 
     const setFromPickedEpoch = (which: 'start'|'end', value: number, hasTime: boolean) => {
@@ -562,22 +637,32 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
         setError(undefined);
         try {
             if (event) {
-                const updated = await updateEvent(event.id, {
-                    title: trimmed,
-                    description,
-                    location: location.trim(),
-                    teamId: teamID,
-                    channelId: visibility === 'channel' ? channelID : '',
-                    visibility,
-                    assigneeIds,
-                    startAt: times.startAt,
-                    endAt: times.endAt,
-                    allDay,
-                    timezone: timeZone,
-                    recurrence: buildRecurrence() ?? {frequency: 'none'},
-                    reminders,
-                });
-                onSaved(updated);
+                if (timeOnly && occurrenceStartAt) {
+                    // Single-occurrence move: the server rejects anything but the times here.
+                    const updated = await updateEvent(event.id, {
+                        startAt: times.startAt,
+                        endAt: times.endAt,
+                        occurrenceStartAt,
+                    });
+                    onSaved(updated);
+                } else {
+                    const updated = await updateEvent(event.id, {
+                        title: trimmed,
+                        description,
+                        location: location.trim(),
+                        teamId: teamID,
+                        channelId: visibility === 'channel' ? channelID : '',
+                        visibility,
+                        assigneeIds,
+                        startAt: times.startAt,
+                        endAt: times.endAt,
+                        allDay,
+                        timezone: timeZone,
+                        recurrence: buildRecurrence() ?? {frequency: 'none'},
+                        reminders,
+                    });
+                    onSaved(updated);
+                }
             } else {
                 const created = await createEvent({
                     title: trimmed,
@@ -609,7 +694,11 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
         setDeleting(true);
         setError(undefined);
         try {
-            await deleteEvent(event.id);
+            if (timeOnly && occurrenceStartAt) {
+                await updateEvent(event.id, {occurrenceStartAt, occurrenceCancelled: true});
+            } else {
+                await deleteEvent(event.id);
+            }
             onDeleted?.();
         } catch (err) {
             setDeleting(false);
@@ -642,8 +731,8 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                 onClick={() => setConfirmDelete(true)}
             >
                 <FormattedMessage
-                    id='tasks.event.delete'
-                    defaultMessage='Delete event'
+                    id={timeOnly ? 'tasks.event.delete_occurrence' : 'tasks.event.delete'}
+                    defaultMessage={timeOnly ? 'Delete this event' : 'Delete event'}
                 />
             </Button>
         );
@@ -763,12 +852,54 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                             maxLength={200}
                             autoFocus={canModify}
                             ref={titleRef}
-                            disabled={!canModify}
+                            disabled={!fieldEditable}
                             placeholder={intl.formatMessage({id: 'tasks.event.title_placeholder', defaultMessage: 'Event name'})}
                             onChange={(changeEvent) => setTitle(singleLine(changeEvent.target.value))}
                             onKeyDown={blockEnter}
                         />
                     </div>
+
+                    {occurrenceEdit && canModify && (
+                        <div className='Tasks-EventEditor__editScope'>
+                            <span
+                                className='Tasks-TaskEditor__propertyLabel'
+                                id='tasks-event-edit-scope'
+                            >
+                                <FormattedMessage
+                                    id='tasks.event.edit_scope'
+                                    defaultMessage='Apply changes to'
+                                />
+                            </span>
+                            <div
+                                className='Tasks-TaskEditor__quickOptions'
+                                role='group'
+                                aria-labelledby='tasks-event-edit-scope'
+                            >
+                                {(['occurrence', 'series'] as const).map((value) => (
+                                    <button
+                                        key={value}
+                                        type='button'
+                                        className={`Tasks-TaskEditor__quickOption${editScope === value ? ' Tasks-TaskEditor__quickOption--selected' : ''}`}
+                                        aria-pressed={editScope === value}
+                                        onClick={() => changeEditScope(value)}
+                                    >
+                                        <FormattedMessage
+                                            id={value === 'occurrence' ? 'tasks.event.edit_scope_occurrence' : 'tasks.event.edit_scope_series'}
+                                            defaultMessage={value === 'occurrence' ? 'This event only' : 'All events'}
+                                        />
+                                    </button>
+                                ))}
+                            </div>
+                            {timeOnly && (
+                                <p className='Tasks-TaskEditor__hint'>
+                                    <FormattedMessage
+                                        id='tasks.event.occurrence_hint'
+                                        defaultMessage='Only this event’s date and time will change. Switch to “All events” to edit the title and other details.'
+                                    />
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     <div
                         className='Tasks-TaskEditor__description'
@@ -793,7 +924,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                     value={description}
                                     rows={3}
                                     maxLength={8000}
-                                    disabled={!canModify}
+                                    disabled={!fieldEditable}
                                     placeholder={intl.formatMessage({id: 'tasks.event.description_placeholder', defaultMessage: 'Description'})}
                                     onChange={(changeEvent) => setDescription(changeEvent.target.value)}
                                 />
@@ -812,7 +943,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                     >
                                         <IconButton
                                             size='x-small'
-                                            disabled={!canModify}
+                                            disabled={!fieldEditable}
                                             icon={<Icon glyph={<FormatBoldIcon/>}/>}
                                             aria-label={intl.formatMessage({id: 'tasks.editor.bold', defaultMessage: 'Bold'})}
                                             onMouseDown={(event) => event.preventDefault()}
@@ -820,7 +951,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                         />
                                         <IconButton
                                             size='x-small'
-                                            disabled={!canModify}
+                                            disabled={!fieldEditable}
                                             icon={<Icon glyph={<FormatItalicIcon/>}/>}
                                             aria-label={intl.formatMessage({id: 'tasks.editor.italic', defaultMessage: 'Italic'})}
                                             onMouseDown={(event) => event.preventDefault()}
@@ -828,7 +959,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                         />
                                         <IconButton
                                             size='x-small'
-                                            disabled={!canModify}
+                                            disabled={!fieldEditable}
                                             icon={<Icon glyph={<FormatListBulletedIcon/>}/>}
                                             aria-label={intl.formatMessage({id: 'tasks.editor.bullet_list', defaultMessage: 'Bulleted list'})}
                                             onMouseDown={(event) => event.preventDefault()}
@@ -836,7 +967,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                         />
                                         <IconButton
                                             size='x-small'
-                                            disabled={!canModify}
+                                            disabled={!fieldEditable}
                                             icon={<Icon glyph={<LinkVariantIcon/>}/>}
                                             aria-label={intl.formatMessage({id: 'tasks.editor.link', defaultMessage: 'Link'})}
                                             onMouseDown={(event) => event.preventDefault()}
@@ -919,7 +1050,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                             className='Tasks-EventEditor__input'
                             value={location}
                             maxLength={2048}
-                            disabled={!canModify}
+                            disabled={!fieldEditable}
                             placeholder={intl.formatMessage({id: 'tasks.event.location_placeholder', defaultMessage: 'Location or meeting link (Zoom, Meet…)'})}
                             onChange={(changeEvent) => setLocation(changeEvent.target.value)}
                         />
@@ -1002,7 +1133,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                             type='button'
                             className='Tasks-TaskEditor__propertySummary'
                             aria-expanded={openProperty === 'repeat'}
-                            disabled={!canModify}
+                            disabled={!fieldEditable}
                             onClick={() => setOpenProperty(openProperty === 'repeat' ? undefined : 'repeat')}
                         >
                             <Icon
@@ -1015,7 +1146,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                             type='button'
                             className='Tasks-TaskEditor__propertySummary'
                             aria-expanded={openProperty === 'timezone'}
-                            disabled={!canModify}
+                            disabled={!fieldEditable}
                             onClick={() => setOpenProperty(openProperty === 'timezone' ? undefined : 'timezone')}
                         >
                             <Icon
@@ -1028,7 +1159,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                             type='button'
                             className='Tasks-TaskEditor__propertySummary Tasks-EventEditor__scopeSummary'
                             aria-expanded={openProperty === 'scope'}
-                            disabled={!canModify}
+                            disabled={!fieldEditable}
                             onClick={() => setOpenProperty(openProperty === 'scope' ? undefined : 'scope')}
                         >
                             <Icon
@@ -1054,7 +1185,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                         label={intl.formatMessage({id: 'tasks.event.repeat', defaultMessage: 'Repeat'})}
                                         options={repeatOptions}
                                         value={repeatMode}
-                                        disabled={!canModify}
+                                        disabled={!fieldEditable}
                                         onChange={(value) => {
                                             const next = value as typeof repeatMode;
                                             setRepeatMode(next);
@@ -1085,7 +1216,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                                             className={`Tasks-TaskEditor__quickOption${selected ? ' Tasks-TaskEditor__quickOption--selected' : ''}`}
                                                             aria-pressed={selected}
                                                             aria-label={weekdayNames[weekday]}
-                                                            disabled={!canModify}
+                                                            disabled={!fieldEditable}
                                                             onClick={() => toggleWeekday(weekday)}
                                                         >
                                                             {label}
@@ -1110,7 +1241,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                                 max={99}
                                                 value={repeatInterval}
                                                 aria-label={intl.formatMessage({id: 'tasks.event.repeat.interval', defaultMessage: 'Repeat interval'})}
-                                                disabled={!canModify}
+                                                disabled={!fieldEditable}
                                                 onChange={(changeEvent) => {
                                                     const next = Number(changeEvent.target.value);
                                                     setRepeatInterval(Number.isFinite(next) ? Math.min(99, Math.max(1, Math.trunc(next))) : 1);
@@ -1121,7 +1252,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                                 label={intl.formatMessage({id: 'tasks.event.repeat.unit', defaultMessage: 'Unit'})}
                                                 options={repeatUnitOptions}
                                                 value={repeatUnit}
-                                                disabled={!canModify}
+                                                disabled={!fieldEditable}
                                                 onChange={(value) => setRepeatUnit(value as typeof repeatUnit)}
                                             />
                                         </div>
@@ -1140,7 +1271,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                                 min={startDateISO}
                                                 value={repeatUntil}
                                                 aria-label={intl.formatMessage({id: 'tasks.event.repeat.until', defaultMessage: 'Repeat until'})}
-                                                disabled={!canModify}
+                                                disabled={!fieldEditable}
                                                 onChange={(changeEvent) => setRepeatUntil(changeEvent.target.value)}
                                             />
                                             <p className='Tasks-TaskEditor__hint'>
@@ -1164,7 +1295,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                     <TimeZoneInput
                                         value={timeZone}
                                         onChange={changeTimeZone}
-                                        disabled={!canModify}
+                                        disabled={!fieldEditable}
                                     />
                                 </div>
                             )}
@@ -1189,7 +1320,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                                     type='button'
                                                     className={`Tasks-TaskEditor__quickOption${selected ? ' Tasks-TaskEditor__quickOption--selected' : ''}`}
                                                     aria-pressed={selected}
-                                                    disabled={!canModify}
+                                                    disabled={!fieldEditable}
                                                     onClick={() => changeVisibility(value)}
                                                 >
                                                     {visibilityLabels[value]}
@@ -1201,7 +1332,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                         label={intl.formatMessage({id: 'tasks.event.team', defaultMessage: 'Team'})}
                                         options={teamOptions}
                                         value={teamID}
-                                        disabled={!canModify}
+                                        disabled={!fieldEditable}
                                         onChange={changeTeam}
                                     />
                                     {visibility === 'channel' && (
@@ -1209,7 +1340,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                                             label={intl.formatMessage({id: 'tasks.event.channel', defaultMessage: 'Channel'})}
                                             options={channelOptions}
                                             value={channelID}
-                                            disabled={!canModify}
+                                            disabled={!fieldEditable}
                                             onChange={setChannelID}
                                         />
                                     )}
@@ -1236,7 +1367,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                             channelId={visibility === 'channel' ? channelID : undefined}
                             assigneeIds={assigneeIds}
                             onChange={setAssigneeIds}
-                            disabled={!canModify}
+                            disabled={!fieldEditable}
                             privateTask={visibility === 'private'}
                         />
                     </div>
@@ -1257,7 +1388,7 @@ export default function EventEditor({eventId, defaults, onClose, onSaved, onDele
                         <ReminderPicker
                             value={reminders}
                             onChange={setReminders}
-                            disabled={!canModify}
+                            disabled={!fieldEditable}
                         />
                     </div>
 

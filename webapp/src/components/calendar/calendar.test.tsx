@@ -192,7 +192,7 @@ describe('Calendar', () => {
         expect(container.querySelector('.Tasks-CalendarCard')).not.toBeInTheDocument();
 
         await userEvent.setup().click(screen.getByRole('button', {name: 'Sprint planning'}));
-        expect(onOpenEvent).toHaveBeenCalledWith('event-1');
+        expect(onOpenEvent).toHaveBeenCalledWith('event-1', undefined);
     });
 
     it('moves to the next period', async () => {
