@@ -1,0 +1,117 @@
+/* Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
+   See LICENSE.txt for license information. */
+
+.Tasks-CalendarColorSettings {
+    position: relative;
+    flex: none;
+}
+
+/* Portaled to the body like the event date picker so no sidebar container can clip it. */
+.Tasks-CalendarColorSettings__popover {
+    position: fixed;
+    z-index: 3000;
+    top: -9999px;
+    left: -9999px;
+    box-sizing: border-box;
+    width: 248px;
+    padding: var(--spacing-m);
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+    border-radius: var(--radius-m);
+    background: var(--center-channel-bg);
+    box-shadow: var(--elevation-4);
+    color: var(--center-channel-color);
+}
+
+.Tasks-CalendarColorSettings__heading {
+    margin: 0 0 var(--spacing-s);
+    font-size: var(--font-size-75);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-75);
+}
+
+.Tasks-CalendarColorSettings__row + .Tasks-CalendarColorSettings__row {
+    margin-top: var(--spacing-s);
+}
+
+.Tasks-CalendarColorSettings__rowLabel {
+    display: block;
+    margin-bottom: var(--spacing-xxs);
+    color: rgba(var(--center-channel-color-rgb), 0.72);
+    font-size: var(--font-size-75);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-75);
+}
+
+.Tasks-CalendarColorSettings__swatches {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-xxs);
+}
+
+/* A swatch is a colored circle; selection shows the ring instead of a check so the color itself
+   stays visible. */
+.Tasks-CalendarColorSettings__swatch {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+}
+
+.Tasks-CalendarColorSettings__swatch--selected {
+    outline: 2px solid rgba(var(--button-bg-rgb), 0.56);
+    outline-offset: 1px;
+}
+
+.Tasks-CalendarColorSettings__swatch:focus-visible {
+    outline: 2px solid rgba(var(--button-bg-rgb), 0.56);
+    outline-offset: 1px;
+}
+
+.Tasks-CalendarColorSettings__custom {
+    display: inline-flex;
+    padding: 2px;
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+    border-radius: var(--radius-s);
+    cursor: pointer;
+}
+
+.Tasks-CalendarColorSettings__custom--selected {
+    border-color: rgba(var(--button-bg-rgb), 0.56);
+}
+
+.Tasks-CalendarColorSettings__custom input[type='color'] {
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-s);
+    background: none;
+    cursor: pointer;
+}
+
+.Tasks-CalendarColorSettings__default {
+    padding: var(--spacing-xxxs) var(--spacing-xs);
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+    border-radius: var(--radius-pill);
+    background: var(--center-channel-bg);
+    color: rgba(var(--center-channel-color-rgb), 0.72);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: var(--font-size-50);
+    line-height: var(--line-height-50);
+}
+
+.Tasks-CalendarColorSettings__default:hover {
+    border-color: rgba(var(--button-bg-rgb), 0.56);
+    color: var(--button-bg);
+}
+
+.Tasks-CalendarColorSettings__hint {
+    margin: var(--spacing-s) 0 0;
+    color: rgba(var(--center-channel-color-rgb), 0.56);
+    font-size: var(--font-size-50);
+    line-height: var(--line-height-50);
+}

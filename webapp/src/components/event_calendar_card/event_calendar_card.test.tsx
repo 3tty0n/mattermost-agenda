@@ -27,10 +27,11 @@ const event = (location?: string): EventSummary => ({
     version: 1,
 });
 
-const renderCard = (value?: string, onOpen = jest.fn(), occurrenceStartAt?: number) => renderWithStore(
+const renderCard = (value?: string, onOpen = jest.fn(), occurrenceStartAt?: number, mine?: boolean) => renderWithStore(
     <EventCalendarCard
         event={event(value)}
         occurrenceStartAt={occurrenceStartAt}
+        mine={mine}
         profiles={{}}
         onOpen={onOpen}
     />,
@@ -65,5 +66,10 @@ describe('EventCalendarCard location', () => {
         renderCard(undefined, onOpen, 1234);
         await userEvent.click(screen.getByRole('button', {name: 'Sync'}));
         expect(onOpen).toHaveBeenCalledWith('e1', 1234);
+    });
+
+    it('marks the user\'s own events so they get the personal color', () => {
+        const {container} = renderCard(undefined, jest.fn(), undefined, true);
+        expect(container.querySelector('.Tasks-EventCard')).toHaveClass('Tasks-EventCard--mine');
     });
 });

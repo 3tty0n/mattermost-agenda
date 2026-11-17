@@ -8,18 +8,32 @@
     min-width: 0;
     padding: var(--spacing-xs) var(--spacing-s);
     border: 1px solid rgba(var(--center-channel-color-rgb), 0.12);
+    border-left: 3px solid var(--Tasks-CalendarTeam);
     border-radius: var(--radius-s);
     background: var(--center-channel-bg);
     cursor: pointer;
 }
 
+.Tasks-CalendarCard--mine {
+    border-left-color: var(--Tasks-CalendarMine);
+}
+
 .Tasks-CalendarCard:hover {
-    border-color: rgba(var(--button-bg-rgb), 0.48);
-    background: rgba(var(--button-bg-rgb), 0.04);
+    border-color: rgba(var(--Tasks-CalendarTeamRgb), 0.48);
+    background: rgba(var(--Tasks-CalendarTeamRgb), 0.04);
+}
+
+.Tasks-CalendarCard--mine:hover {
+    border-color: rgba(var(--Tasks-CalendarMineRgb), 0.48);
+    background: rgba(var(--Tasks-CalendarMineRgb), 0.04);
 }
 
 .Tasks-CalendarCard:focus-within {
-    border-color: var(--button-bg);
+    border-color: var(--Tasks-CalendarTeam);
+}
+
+.Tasks-CalendarCard--mine:focus-within {
+    border-color: var(--Tasks-CalendarMine);
 }
 
 .Tasks-CalendarCard__title {

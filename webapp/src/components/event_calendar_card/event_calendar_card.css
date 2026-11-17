@@ -4,17 +4,28 @@
 .Tasks-EventCard {
     min-width: 0;
     padding: var(--spacing-s);
-    border: 1px solid rgba(var(--button-bg-rgb), 0.24);
-    border-left: 3px solid var(--button-bg);
+    border: 1px solid rgba(var(--Tasks-CalendarTeamRgb), 0.24);
+    border-left: 3px solid var(--Tasks-CalendarTeam);
     border-radius: var(--radius-s);
-    background: rgba(var(--button-bg-rgb), 0.06);
+    background: rgba(var(--Tasks-CalendarTeamRgb), 0.06);
     container-type: inline-size;
     cursor: pointer;
 }
 
+.Tasks-EventCard--mine {
+    border-color: rgba(var(--Tasks-CalendarMineRgb), 0.24);
+    border-left-color: var(--Tasks-CalendarMine);
+    background: rgba(var(--Tasks-CalendarMineRgb), 0.06);
+}
+
 .Tasks-EventCard:hover {
-    border-color: rgba(var(--button-bg-rgb), 0.56);
-    background: rgba(var(--button-bg-rgb), 0.10);
+    border-color: rgba(var(--Tasks-CalendarTeamRgb), 0.56);
+    background: rgba(var(--Tasks-CalendarTeamRgb), 0.10);
+}
+
+.Tasks-EventCard--mine:hover {
+    border-color: rgba(var(--Tasks-CalendarMineRgb), 0.56);
+    background: rgba(var(--Tasks-CalendarMineRgb), 0.10);
 }
 
 .Tasks-EventCard__body {
@@ -28,9 +39,13 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-xxs);
-    color: var(--button-bg);
+    color: var(--Tasks-CalendarTeam);
     font-size: var(--font-size-25);
     line-height: var(--line-height-25);
+}
+
+.Tasks-EventCard--mine .Tasks-EventCard__meta {
+    color: var(--Tasks-CalendarMine);
 }
 
 /* The time range (the event's duration) never shrinks or truncates. */
@@ -57,7 +72,11 @@
 }
 
 .Tasks-EventCard:hover .Tasks-EventCard__title {
-    color: var(--button-bg);
+    color: var(--Tasks-CalendarTeam);
+}
+
+.Tasks-EventCard--mine:hover .Tasks-EventCard__title {
+    color: var(--Tasks-CalendarMine);
 }
 
 /* The meeting link (or place) gets its own line and truncates; the full value is in the tooltip. */

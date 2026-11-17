@@ -20,13 +20,16 @@ import './task_calendar_card.css';
 type Props = {
     task: TaskSummary;
     profiles: Record<string, Profile>;
+
+    // True when the signed-in user created the task, which tints the card with their own color.
+    mine?: boolean;
     onOpen: (taskID: string) => void;
 };
 
 // TaskCalendarCard is the smallest readable task representation: the name, priority, time and a
 // few assignees. It deliberately omits controls so a day can hold several cards in a narrow
 // sidebar; clicking the card opens the full task editor.
-function TaskCalendarCard({task, profiles, onOpen}: Props) {
+function TaskCalendarCard({task, mine, profiles, onOpen}: Props) {
     const intl = useIntl();
     const hour12 = useHour12();
     const done = task.status === 'done';
@@ -36,7 +39,7 @@ function TaskCalendarCard({task, profiles, onOpen}: Props) {
 
     return (
         <article
-            className={`Tasks-CalendarCard${done ? ' Tasks-CalendarCard--done' : ''}`}
+            className={`Tasks-CalendarCard${done ? ' Tasks-CalendarCard--done' : ''}${mine ? ' Tasks-CalendarCard--mine' : ''}`}
             onClick={() => onOpen(task.id)}
         >
             <button

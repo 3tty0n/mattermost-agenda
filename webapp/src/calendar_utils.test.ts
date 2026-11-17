@@ -9,6 +9,7 @@ const task = (overrides: Partial<TaskSummary> = {}): TaskSummary => ({
     id: 'task-1',
     teamId: 'team-id',
     visibility: 'team',
+    creatorId: 'user-1',
     title: 'Task',
     status: 'todo',
     priority: 'normal',

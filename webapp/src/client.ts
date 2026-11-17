@@ -5,6 +5,7 @@ import manifest from 'manifest';
 
 import type {
     Assignee,
+    CalendarColors,
     CreateEventInput,
     CreateTaskInput,
     Event,
@@ -171,6 +172,16 @@ export type ClientConfig = {
 
 export async function fetchConfig(signal?: AbortSignal): Promise<ClientConfig> {
     return doFetch<ClientConfig>('/config', {}, signal);
+}
+
+// getCalendarColors reads the signed-in user's calendar colors; unset colors are empty.
+export async function getCalendarColors(signal?: AbortSignal): Promise<CalendarColors> {
+    return doFetch<CalendarColors>('/me/calendar-colors', {}, signal);
+}
+
+// setCalendarColors stores the signed-in user's calendar colors and returns the stored form.
+export async function setCalendarColors(colors: CalendarColors): Promise<CalendarColors> {
+    return doFetch<CalendarColors>('/me/calendar-colors', {method: 'put', body: JSON.stringify(colors)});
 }
 
 export async function getEvent(id: string, signal?: AbortSignal): Promise<Event> {

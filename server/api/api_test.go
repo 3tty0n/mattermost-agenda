@@ -20,6 +20,7 @@ import (
 	"github.com/3tty0n/mattermost-tasks/server/store/kvstore"
 	"github.com/3tty0n/mattermost-tasks/server/tasks"
 	"github.com/3tty0n/mattermost-tasks/server/testutil"
+	"github.com/3tty0n/mattermost-tasks/server/userprefs"
 )
 
 type noopPublisher struct{}
@@ -34,6 +35,7 @@ type apiTestEnv struct {
 	store   kvstore.Store
 	tasks   *tasks.Service
 	events  *events.EventService
+	prefs   *userprefs.Service
 }
 
 func newAPITestEnv(t *testing.T) *apiTestEnv {
@@ -46,12 +48,14 @@ func newAPITestEnv(t *testing.T) *apiTestEnv {
 	publisher := noopPublisher{}
 	taskService := tasks.NewService(client, store, checker, publisher, nil, tasks.WithClock(func() int64 { return 1000 }))
 	eventService := events.NewEventService(client, store, checker, publisher, events.WithEventClock(func() int64 { return 1000 }))
+	prefsService := userprefs.NewService(store)
 	return &apiTestEnv{
-		handler: NewHandler(api, client, checker, taskService, eventService),
+		handler: NewHandler(api, client, checker, taskService, eventService, prefsService),
 		api:     api,
 		store:   store,
 		tasks:   taskService,
 		events:  eventService,
+		prefs:   prefsService,
 	}
 }
 
@@ -106,6 +110,8 @@ func TestAllRoutesRejectUnauthenticatedRequests(t *testing.T) {
 		{http.MethodDelete, "/api/v1/events/" + id},
 		{http.MethodGet, "/api/v1/assignees"},
 		{http.MethodGet, "/api/v1/config"},
+		{http.MethodGet, "/api/v1/me/calendar-colors"},
+		{http.MethodPut, "/api/v1/me/calendar-colors"},
 	}
 	for _, route := range routes {
 		t.Run(route.method+" "+route.path, func(t *testing.T) {
@@ -271,6 +277,44 @@ func TestConfigAPI(t *testing.T) {
 	env.handler.SetClientConfig(func() ClientConfig { return ClientConfig{DefaultEventDurationMinutes: 30} })
 	got = decodeResponse[ClientConfig](t, env.serve(http.MethodGet, "/api/v1/config", "", actorID))
 	assert.Equal(t, 30, got.DefaultEventDurationMinutes)
+}
+
+func TestCalendarColorsAPI(t *testing.T) {
+	env := newAPITestEnv(t)
+	actorID, otherID := model.NewId(), model.NewId()
+
+	// A user without preferences gets the zero value, not an error.
+	got := decodeResponse[taskmodel.CalendarColors](t, env.serve(http.MethodGet, "/api/v1/me/calendar-colors", "", actorID))
+	assert.Equal(t, taskmodel.CalendarColors{}, got)
+
+	// Setting colors normalizes them and only affects the caller.
+	w := env.serve(http.MethodPut, "/api/v1/me/calendar-colors", `{"mine":"#4F7BD9","team":""}`, actorID)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	saved := decodeResponse[taskmodel.CalendarColors](t, w)
+	assert.Equal(t, taskmodel.CalendarColors{Mine: "#4f7bd9"}, saved)
+
+	got = decodeResponse[taskmodel.CalendarColors](t, env.serve(http.MethodGet, "/api/v1/me/calendar-colors", "", actorID))
+	assert.Equal(t, saved, got)
+	other := decodeResponse[taskmodel.CalendarColors](t, env.serve(http.MethodGet, "/api/v1/me/calendar-colors", "", otherID))
+	assert.Equal(t, taskmodel.CalendarColors{}, other)
+
+	// The value reaches a CSS property, so anything but #rrggbb is rejected.
+	for _, body := range []string{
+		`{"mine":"red","team":""}`,
+		`{"mine":"#12345","team":""}`,
+		`{"mine":"#12345g","team":""}`,
+		`{"mine":"javascript:x","team":""}`,
+		`{"mine":123,"team":""}`,
+	} {
+		w := env.serve(http.MethodPut, "/api/v1/me/calendar-colors", body, actorID)
+		assert.Equal(t, http.StatusBadRequest, w.Code, body)
+	}
+
+	// Clearing both colors removes the record again.
+	w = env.serve(http.MethodPut, "/api/v1/me/calendar-colors", `{"mine":"","team":""}`, actorID)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	got = decodeResponse[taskmodel.CalendarColors](t, env.serve(http.MethodGet, "/api/v1/me/calendar-colors", "", actorID))
+	assert.Equal(t, taskmodel.CalendarColors{}, got)
 }
 
 func TestAPISetsNoStoreAndContentType(t *testing.T) {

@@ -1,11 +1,13 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
+import {calendarColorVars} from 'calendar_colors';
 import {addLocalDays, calendarQueryBounds, calendarRange, localDateKey, startOfLocalDay, startOfWeek, weekStartsOn, type CalendarMode} from 'calendar_utils';
 import {compareEventOccurrences, eventOccurrencesForDays, type CalendarEventOccurrence} from 'event_utils';
-import {useEvents, useProfiles, useTasks} from 'hooks';
+import {useCalendarColors, useEvents, useProfiles, useTasks} from 'hooks';
 import {type KeyboardEvent, useMemo, useRef, useState} from 'react';
 import {FormattedMessage, useIntl} from 'react-intl';
+import {useSelector} from 'react-redux';
 import {compareOccurrences, occurrencesForTask, utcDateKey, type CalendarOccurrence} from 'recurrence_utils';
 
 import CalendarCheckOutlineIcon from '@mattermost/compass-icons/components/calendar-check-outline';
@@ -20,6 +22,9 @@ import {Spinner} from '@mattermost/compass-ui/components/spinner';
 import {Tabs} from '@mattermost/compass-ui/components/tabs';
 import {Tag} from '@mattermost/compass-ui/components/tag';
 
+import {selectCurrentUserId} from 'selectors';
+
+import CalendarColorSettings from 'components/calendar/calendar_color_settings';
 import EventCalendarCard from 'components/event_calendar_card/event_calendar_card';
 import TaskCalendarCard from 'components/task_calendar_card/task_calendar_card';
 
@@ -57,11 +62,14 @@ function defaultSelectedKey(mode: CalendarMode, cursor: Date, weekStart: number)
 
 export default function Calendar({scope, teamId, priority, assigneeId, revision, onOpenTask, onOpenEvent, onCreateEvent, onCreateTask}: Props) {
     const intl = useIntl();
+    const currentUserId = useSelector(selectCurrentUserId);
     const [mode, setMode] = useState<CalendarMode>('month');
     const [cursor, setCursor] = useState(() => startOfLocalDay(new Date()));
     const [selectedKey, setSelectedKey] = useState(() => localDateKey(startOfLocalDay(new Date())));
     const [reload, setReload] = useState(0);
     const dayRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+    const {colors, saving, save} = useCalendarColors();
 
     const weekStart = useMemo(() => weekStartsOn(intl.locale), [intl.locale]);
     const range = useMemo(() => calendarRange(mode, cursor, weekStart), [mode, cursor, weekStart]);
@@ -202,6 +210,10 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
         return {continuesLeft: startKey < key, continuesRight: endKey > key};
     };
 
+    // The calendar tints items the user created with their own color, everything else with the
+    // team color.
+    const isMine = (creatorId?: string) => Boolean(currentUserId && creatorId === currentUserId);
+
     const goTo = (nextCursor: Date, nextMode: CalendarMode = mode) => {
         setCursor(nextCursor);
         setSelectedKey(defaultSelectedKey(nextMode, nextCursor, weekStart));
@@ -273,6 +285,7 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                 <TaskCalendarCard
                     key={`${occurrence.task.id}:${occurrence.dueAt}`}
                     task={{...occurrence.task, dueAt: occurrence.dueAt}}
+                    mine={isMine(occurrence.task.creatorId)}
                     profiles={profiles}
                     onOpen={onOpenTask}
                 />
@@ -287,6 +300,7 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                     key={`${occurrence.event.id}:${occurrence.dateKey}`}
                     event={occurrence.event}
                     occurrenceStartAt={occurrence.originalStart}
+                    mine={isMine(occurrence.event.creatorId)}
                     profiles={profiles}
                     onOpen={onOpenEvent}
                 />
@@ -312,7 +326,13 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
     );
 
     return (
-        <div className='Tasks-Calendar'>
+
+        // The style carries the user's calendar colors as custom properties; unset colors fall
+        // back to the defaults declared in calendar.css.
+        <div
+            className='Tasks-Calendar'
+            style={calendarColorVars(colors)}
+        >
             <div className='Tasks-Calendar__toolbar'>
                 <div className='Tasks-Calendar__nav'>
                     <IconButton
@@ -387,6 +407,11 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                             ),
                         },
                     ]}
+                />
+                <CalendarColorSettings
+                    colors={colors}
+                    disabled={saving}
+                    onChange={save}
                 />
             </div>
 
@@ -506,7 +531,7 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                                                         return (
                                                             <span
                                                                 key={`${occurrence.event.id}:${occurrence.dateKey}`}
-                                                                className={`Tasks-Calendar__eventBar${continuesLeft || continuesRight ? ' Tasks-Calendar__eventBar--flow' : ''}${connectsLeft ? ' Tasks-Calendar__eventBar--connectLeft' : ''}${connectsRight ? ' Tasks-Calendar__eventBar--connectRight' : ''}`}
+                                                                className={`Tasks-Calendar__eventBar${isMine(occurrence.event.creatorId) ? ' Tasks-Calendar__eventBar--mine' : ''}${continuesLeft || continuesRight ? ' Tasks-Calendar__eventBar--flow' : ''}${connectsLeft ? ' Tasks-Calendar__eventBar--connectLeft' : ''}${connectsRight ? ' Tasks-Calendar__eventBar--connectRight' : ''}`}
                                                             />
                                                         );
                                                     })}
@@ -520,7 +545,7 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                                                     {dayTasks.slice(0, 3).map((occurrence) => (
                                                         <span
                                                             key={`${occurrence.task.id}:${occurrence.dueAt}`}
-                                                            className={`Tasks-Calendar__dot Tasks-Calendar__dot--${occurrence.task.priority}`}
+                                                            className={`Tasks-Calendar__dot${isMine(occurrence.task.creatorId) ? ' Tasks-Calendar__dot--mine' : ''}`}
                                                         />
                                                     ))}
                                                 </span>

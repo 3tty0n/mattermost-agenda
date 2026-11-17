@@ -1,10 +1,10 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import {screen, waitFor} from '@testing-library/react';
+import {screen, waitFor, within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {localDateKey} from 'calendar_utils';
-import {fetchEvents, fetchTasks, getProfilePictureUrl, getProfiles} from 'client';
+import {fetchEvents, fetchTasks, getCalendarColors, getProfilePictureUrl, getProfiles, setCalendarColors} from 'client';
 
 import type {ListResult, TaskSummary} from 'types';
 
@@ -17,15 +17,19 @@ jest.mock('client', () => ({
     fetchAssignees: jest.fn(),
     fetchEvents: jest.fn(),
     fetchTasks: jest.fn(),
+    getCalendarColors: jest.fn(),
     getProfiles: jest.fn(),
     getProfilePictureUrl: jest.fn(),
     getSiteURL: jest.fn(() => ''),
+    setCalendarColors: jest.fn(),
     setSiteURL: jest.fn(),
 }));
 
 const fetchTasksMock = fetchTasks as jest.MockedFunction<typeof fetchTasks>;
 const fetchEventsMock = fetchEvents as jest.MockedFunction<typeof fetchEvents>;
 const getProfilesMock = getProfiles as jest.MockedFunction<typeof getProfiles>;
+const getCalendarColorsMock = getCalendarColors as jest.MockedFunction<typeof getCalendarColors>;
+const setCalendarColorsMock = setCalendarColors as jest.MockedFunction<typeof setCalendarColors>;
 
 const todayAt = (hour: number) => {
     const now = new Date();
@@ -36,6 +40,7 @@ const task = (overrides: Partial<TaskSummary> = {}): TaskSummary => ({
     id: 'task-1',
     teamId: ids.team,
     visibility: 'team',
+    creatorId: ids.user,
     title: 'Pick up mail',
     status: 'todo',
     priority: 'high',
@@ -73,6 +78,8 @@ describe('Calendar', () => {
         ]));
         getProfilesMock.mockResolvedValue({});
         fetchEventsMock.mockResolvedValue({items: [], total: 0, page: 0, perPage: 100, hasMore: false});
+        getCalendarColorsMock.mockResolvedValue({});
+        setCalendarColorsMock.mockResolvedValue({});
         (getProfilePictureUrl as jest.Mock).mockReturnValue(undefined);
     });
 
@@ -279,6 +286,66 @@ describe('Calendar', () => {
         const slot = onOpenEvent.mock.calls[0][1];
         expect(typeof slot).toBe('number');
         expect(slot).not.toBe(todayAt(10));
+    });
+
+    it('tints my items separately and saves color choices', async () => {
+        const user = userEvent.setup();
+        fetchEventsMock.mockResolvedValue({
+            items: [{
+                id: 'event-1',
+                teamId: ids.team,
+                visibility: 'team',
+                creatorId: ids.user,
+                assigneeIds: [],
+                title: 'Mine',
+                startAt: todayAt(10),
+                endAt: todayAt(11),
+                allDay: false,
+                timezone: 'UTC',
+                createdAt: 1,
+                updatedAt: 1,
+                version: 1,
+            }, {
+                id: 'event-2',
+                teamId: ids.team,
+                visibility: 'team',
+                creatorId: ids.otherUser,
+                assigneeIds: [],
+                title: 'Theirs',
+                startAt: todayAt(12),
+                endAt: todayAt(13),
+                allDay: false,
+                timezone: 'UTC',
+                createdAt: 1,
+                updatedAt: 1,
+                version: 1,
+            }],
+            total: 2,
+            page: 0,
+            perPage: 100,
+            hasMore: false,
+        });
+        fetchTasksMock.mockResolvedValue(page([
+            task(),
+            task({id: 'task-2', title: 'Theirs', creatorId: ids.otherUser, dueAt: todayAt(9)}),
+        ]));
+        const {container} = renderCalendar();
+
+        await screen.findByRole('button', {name: 'Pick up mail'});
+
+        // The event bar and task dot of the user's own items carry the mine variant; other
+        // people's stay on the team color.
+        const bar = container.querySelector('.Tasks-Calendar__eventBar');
+        expect(bar).toHaveClass('Tasks-Calendar__eventBar--mine');
+        const dots = container.querySelectorAll('.Tasks-Calendar__dot');
+        expect(dots[0]).not.toHaveClass('Tasks-Calendar__dot--mine');
+        expect(dots[1]).toHaveClass('Tasks-Calendar__dot--mine');
+
+        // Picking a color stores it for the signed-in user.
+        await user.click(screen.getByRole('button', {name: 'Calendar colors'}));
+        const dialog = screen.getByRole('dialog', {name: 'Calendar colors'});
+        await user.click(within(dialog).getByRole('button', {name: 'Set the Team items color to #e8534a'}));
+        await waitFor(() => expect(setCalendarColorsMock).toHaveBeenCalledWith({team: '#e8534a'}));
     });
 
     it('moves to the next period', async () => {

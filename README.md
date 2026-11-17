@@ -24,6 +24,8 @@ accounts, no external service, no second database.
 - **Reminders:** a direct message from the plugin bot before a task's due time or an event's start;
   pick any of *at the time, 5 / 10 / 15 minutes, 1 day, 1 week* before.
 - **Visibility:** *Only me*, *Team* or *Channel*; the server re-checks it on every request.
+- **Calendar colors:** your own items get one color and everyone else's another; pick a preset or
+  any color, and the choice follows you across devices.
 - **Quick capture:** **Create task** on any post, quick add in each board column, assignee
   autocomplete, assignment notifications, and `/task` / `/event` slash commands.
 

@@ -2,6 +2,13 @@
    See LICENSE.txt for license information. */
 
 .Tasks-Calendar {
+    /* The user's calendar colors. Unset, "My items" keeps the theme accent and the team gets a
+       green that reads on both light and dark themes; calendar_colors.ts overrides both per user. */
+    --Tasks-CalendarMine: var(--button-bg);
+    --Tasks-CalendarMineRgb: var(--button-bg-rgb);
+    --Tasks-CalendarTeam: #62a461;
+    --Tasks-CalendarTeamRgb: 98, 164, 97;
+
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -166,19 +173,11 @@
     width: 4px;
     height: 4px;
     border-radius: var(--radius-pill);
-    background: rgba(var(--center-channel-color-rgb), 0.32);
+    background: var(--Tasks-CalendarTeam);
 }
 
-.Tasks-Calendar__dot--normal {
-    background: rgba(var(--button-bg-rgb), 0.72);
-}
-
-.Tasks-Calendar__dot--high {
-    background: var(--away-indicator, var(--button-bg));
-}
-
-.Tasks-Calendar__dot--urgent {
-    background: var(--error-text);
+.Tasks-Calendar__dot--mine {
+    background: var(--Tasks-CalendarMine);
 }
 
 .Tasks-Calendar__eventBars {
@@ -193,7 +192,11 @@
     width: 100%;
     height: 3px;
     border-radius: var(--radius-pill);
-    background: rgba(var(--button-bg-rgb), 0.56);
+    background: var(--Tasks-CalendarTeam);
+}
+
+.Tasks-Calendar__eventBar--mine {
+    background: var(--Tasks-CalendarMine);
 }
 
 /* A multi-day event draws one continuous band across its days: every segment bleeds to the cell

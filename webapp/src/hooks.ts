@@ -1,13 +1,13 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import {fetchAssignees, fetchConfig, fetchEvents, fetchTasks, getProfiles, type Profile} from 'client';
-import {type FocusEvent, type RefObject, useEffect, useRef, useState} from 'react';
+import {fetchAssignees, fetchConfig, fetchEvents, fetchTasks, getCalendarColors, getProfiles, setCalendarColors, type Profile} from 'client';
+import {type FocusEvent, useCallback, type RefObject, useEffect, useRef, useState} from 'react';
 import {useSelector} from 'react-redux';
 
 import {selectUseMilitaryTime} from 'selectors';
 
-import type {Assignee, EventQuery, EventSummary, ListResult, TaskQuery, TaskSummary} from 'types';
+import type {Assignee, CalendarColors, EventQuery, EventSummary, ListResult, TaskQuery, TaskSummary} from 'types';
 
 type AsyncState<T> = {
     data?: T;
@@ -177,6 +177,34 @@ export function useAssignees(teamId: string | undefined, channelId: string | und
 // useHour12 returns the Mattermost clock preference for Intl formatting.
 export function useHour12(): boolean {
     return !useSelector(selectUseMilitaryTime);
+}
+
+// useCalendarColors loads the signed-in user's calendar colors once and saves updates through the
+// plugin server so they follow the user across devices. A failed load leaves the defaults.
+export function useCalendarColors() {
+    const [colors, setColors] = useState<CalendarColors>({});
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        getCalendarColors(controller.signal).then(setColors, () => {});
+        return () => controller.abort();
+    }, []);
+
+    const save = useCallback(async (next: CalendarColors) => {
+        setSaving(true);
+        try {
+            const saved = await setCalendarColors(next);
+            setColors(saved);
+            return true;
+        } catch {
+            return false;
+        } finally {
+            setSaving(false);
+        }
+    }, []);
+
+    return {colors, saving, save};
 }
 
 export function useProfiles(userIds: string[]) {

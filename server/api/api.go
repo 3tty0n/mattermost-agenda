@@ -23,6 +23,7 @@ import (
 	"github.com/3tty0n/mattermost-tasks/server/events"
 	taskmodel "github.com/3tty0n/mattermost-tasks/server/model"
 	"github.com/3tty0n/mattermost-tasks/server/tasks"
+	"github.com/3tty0n/mattermost-tasks/server/userprefs"
 )
 
 // Handler routes the requests the server forwards to the plugin's ServeHTTP hook.
@@ -32,18 +33,20 @@ type Handler struct {
 	access    *access.Checker
 	tasks     *tasks.Service
 	events    *events.EventService
+	prefs     *userprefs.Service
 	config    func() ClientConfig
 	router    *mux.Router
 }
 
 // NewHandler builds the API router.
-func NewHandler(pluginAPI plugin.API, client *pluginapi.Client, checker *access.Checker, tasksService *tasks.Service, eventService *events.EventService) *Handler {
+func NewHandler(pluginAPI plugin.API, client *pluginapi.Client, checker *access.Checker, tasksService *tasks.Service, eventService *events.EventService, prefsService *userprefs.Service) *Handler {
 	h := &Handler{
 		pluginAPI: pluginAPI,
 		client:    client,
 		access:    checker,
 		tasks:     tasksService,
 		events:    eventService,
+		prefs:     prefsService,
 	}
 	h.router = h.initRouter()
 	return h
@@ -75,6 +78,10 @@ func (h *Handler) initRouter() *mux.Router {
 
 	apiRouter.HandleFunc("/config", h.handleGetConfig).Methods(http.MethodGet)
 	apiRouter.HandleFunc("/assignees", h.handleListAssignees).Methods(http.MethodGet)
+
+	// /me routes act on the calling user only; the user comes from the Mattermost-User-ID header.
+	apiRouter.HandleFunc("/me/calendar-colors", h.handleGetCalendarColors).Methods(http.MethodGet)
+	apiRouter.HandleFunc("/me/calendar-colors", h.handleSetCalendarColors).Methods(http.MethodPut)
 
 	return router
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/3tty0n/mattermost-tasks/server/notifications"
 	"github.com/3tty0n/mattermost-tasks/server/reminders"
 	"github.com/3tty0n/mattermost-tasks/server/store/kvstore"
+	"github.com/3tty0n/mattermost-tasks/server/userprefs"
 	"github.com/3tty0n/mattermost-tasks/server/tasks"
 )
 
@@ -29,6 +30,7 @@ type Plugin struct {
 	store    *kvstore.KVStore
 	tasks    *tasks.Service
 	events   *events.EventService
+	prefs    *userprefs.Service
 	notifier *notifications.Notifier
 
 	// reminderJob fires due reminders once a minute on a single cluster node.
@@ -66,6 +68,7 @@ func (p *Plugin) OnActivate() error {
 	scheduler := reminders.New(p.client, p.store, p.notifier, model.GetMillis)
 	p.tasks = tasks.NewService(p.client, p.store, p.access, publisher, p.notifier, tasks.WithReminders(scheduler))
 	p.events = events.NewEventService(p.client, p.store, p.access, publisher, events.WithEventReminders(scheduler))
+	p.prefs = userprefs.NewService(p.store)
 
 	commandClient, err := command.NewCommandHandler(p.client, p.tasks, p.events, command.WithDefaultEventMinutes(func() int {
 		return p.getConfiguration().eventDurationMinutes()
@@ -76,7 +79,7 @@ func (p *Plugin) OnActivate() error {
 	}
 	p.commandClient = commandClient
 
-	p.httpHandler = api.NewHandler(p.API, p.client, p.access, p.tasks, p.events)
+	p.httpHandler = api.NewHandler(p.API, p.client, p.access, p.tasks, p.events, p.prefs)
 	p.httpHandler.SetClientConfig(func() api.ClientConfig {
 		return api.ClientConfig{DefaultEventDurationMinutes: p.getConfiguration().eventDurationMinutes()}
 	})

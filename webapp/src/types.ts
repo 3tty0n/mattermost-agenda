@@ -17,11 +17,19 @@ export type Recurrence = {
 export const TASK_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'done'];
 export const TASK_PRIORITIES: TaskPriority[] = ['none', 'low', 'normal', 'high', 'urgent'];
 
+// CalendarColors are the signed-in user's own calendar colors: mine tints items that user
+// created, team the ones other people created. An empty value means the default.
+export type CalendarColors = {
+    mine?: string;
+    team?: string;
+};
+
 export type TaskSummary = {
     id: string;
     teamId: string;
     channelId?: string;
     visibility: TaskVisibility;
+    creatorId: string;
     title: string;
     status: TaskStatus;
     priority: TaskPriority;

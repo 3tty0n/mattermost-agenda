@@ -257,6 +257,16 @@ The response summary omits `description`; `GET /events/{id}` returns the full re
 `GET /config` returns the settings every signed-in user may read:
 `{"defaultEventDurationMinutes": 60}` (the plugin setting, 5–1440, default 60).
 
+## Calendar colors
+
+`GET /me/calendar-colors` returns the signed-in user's calendar colors:
+`{"mine": "#4f7bd9", "team": "#62a461"}`. An empty value means the default (the theme accent for
+the user's own items, a preset green for everyone else's).
+
+`PUT /me/calendar-colors` with the same shape stores them. Values are optional and must be
+`#rrggbb`; anything else is a 400. Only the calling user's record is written, so the route carries
+no IDs.
+
 ## Assignees
 
 `GET /assignees?team_id=...&channel_id=...&q=...`
