@@ -195,6 +195,44 @@ describe('Calendar', () => {
         expect(onOpenEvent).toHaveBeenCalledWith('event-1', undefined);
     });
 
+    it('opens a recurring occurrence with its slot so the editor can act on it', async () => {
+        const onOpenEvent = jest.fn();
+        fetchTasksMock.mockResolvedValue(page([]));
+        fetchEventsMock.mockResolvedValue({
+            items: [{
+                id: 'event-1',
+                teamId: ids.team,
+                visibility: 'team',
+                creatorId: ids.user,
+                assigneeIds: [ids.user],
+                title: 'Sprint planning',
+                startAt: todayAt(10),
+                endAt: todayAt(11),
+                allDay: false,
+                timezone: 'UTC',
+                recurrence: {frequency: 'daily', interval: 1},
+                createdAt: 1,
+                updatedAt: 1,
+                version: 1,
+            }],
+            total: 1,
+            page: 0,
+            perPage: 100,
+            hasMore: false,
+        });
+        renderCalendar(jest.fn(), onOpenEvent);
+        await userEvent.setup().click(screen.getByRole('tab', {name: 'Week'}));
+
+        const cards = await screen.findAllByRole('button', {name: 'Sprint planning'});
+
+        // The second card in the week is tomorrow's occurrence, not the series anchor.
+        await userEvent.setup().click(cards[1]);
+        expect(onOpenEvent).toHaveBeenCalledTimes(1);
+        const slot = onOpenEvent.mock.calls[0][1];
+        expect(typeof slot).toBe('number');
+        expect(slot).not.toBe(todayAt(10));
+    });
+
     it('moves to the next period', async () => {
         const user = userEvent.setup();
         renderCalendar();

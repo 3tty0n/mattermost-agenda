@@ -151,7 +151,10 @@ function recurringEvents(event: EventSummary, days: Date[]): Array<{event: Event
             occurrences.push({event: {...event, startAt: override.startAt, endAt: override.endAt}, originalStart: startAt});
             continue;
         }
-        occurrences.push({event: {...event, startAt, endAt: startAt + duration}});
+
+        // Every occurrence carries its slot start so the detail view and the editor can act on the
+        // occurrence the user clicked, not the series anchor.
+        occurrences.push({event: {...event, startAt, endAt: startAt + duration}, originalStart: startAt});
     }
 
     // Occurrences moved into the visible window from slots the day scan cannot see.

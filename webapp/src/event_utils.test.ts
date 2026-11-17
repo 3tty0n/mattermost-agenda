@@ -63,6 +63,17 @@ describe('eventOccurrencesForDays', () => {
         expect(occurrences.map((occurrence) => occurrence.dateKey)).toEqual(['2026-01-05', '2026-01-06', '2026-01-07', '2026-01-08']);
     });
 
+    it('names the slot of every occurrence so the editor can act on the clicked one', () => {
+        const recurring = event({recurrence: {frequency: 'daily', interval: 1, until: '2026-01-08'}});
+        const occurrences = eventOccurrencesForDays(recurring, days('2026-01-05', '2026-01-10'));
+        expect(occurrences.map((occurrence) => occurrence.originalStart)).toEqual([
+            new Date(2026, 0, 5, 9, 0).getTime(),
+            new Date(2026, 0, 6, 9, 0).getTime(),
+            new Date(2026, 0, 7, 9, 0).getTime(),
+            new Date(2026, 0, 8, 9, 0).getTime(),
+        ]);
+    });
+
     it('expands selected weekdays', () => {
         const recurring = event({recurrence: {frequency: 'weekly', interval: 1, weekdays: [1, 3], until: '2026-01-15'}});
         const occurrences = eventOccurrencesForDays(recurring, days('2026-01-05', '2026-01-16'));
