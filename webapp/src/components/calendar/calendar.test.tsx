@@ -195,6 +195,54 @@ describe('Calendar', () => {
         expect(onOpenEvent).toHaveBeenCalledWith('event-1', undefined);
     });
 
+    it('draws a multi-day event as one connected band across the month', async () => {
+        // A fixed mid-week day keeps the band away from week edges in any locale.
+        jest.useFakeTimers({now: new Date(2026, 0, 6, 12, 0)});
+        let container: ReturnType<typeof renderCalendar>['container'];
+        try {
+            fetchTasksMock.mockResolvedValue(page([]));
+            fetchEventsMock.mockResolvedValue({
+                items: [{
+                    id: 'event-1',
+                    teamId: ids.team,
+                    visibility: 'team',
+                    creatorId: ids.user,
+                    assigneeIds: [ids.user],
+                    title: 'Offsite',
+                    startAt: todayAt(10),
+                    endAt: todayAt(11) + (2 * 24 * 60 * 60 * 1000),
+                    allDay: false,
+                    timezone: 'UTC',
+                    createdAt: 1,
+                    updatedAt: 1,
+                    version: 1,
+                }],
+                total: 1,
+                page: 0,
+                perPage: 100,
+                hasMore: false,
+            });
+            ({container} = renderCalendar());
+        } finally {
+            jest.useRealTimers();
+        }
+
+        const bars = await waitFor(() => {
+            const found = container.querySelectorAll('.Tasks-Calendar__eventBar');
+            expect(found.length).toBe(3);
+            return found;
+        });
+        expect(bars[0]).toHaveClass('Tasks-Calendar__eventBar--flow');
+        expect(bars[0]).toHaveClass('Tasks-Calendar__eventBar--connectRight');
+        expect(bars[0]).not.toHaveClass('Tasks-Calendar__eventBar--connectLeft');
+        expect(bars[1]).toHaveClass('Tasks-Calendar__eventBar--flow');
+        expect(bars[1]).toHaveClass('Tasks-Calendar__eventBar--connectLeft');
+        expect(bars[1]).toHaveClass('Tasks-Calendar__eventBar--connectRight');
+        expect(bars[2]).toHaveClass('Tasks-Calendar__eventBar--flow');
+        expect(bars[2]).toHaveClass('Tasks-Calendar__eventBar--connectLeft');
+        expect(bars[2]).not.toHaveClass('Tasks-Calendar__eventBar--connectRight');
+    });
+
     it('opens a recurring occurrence with its slot so the editor can act on it', async () => {
         const onOpenEvent = jest.fn();
         fetchTasksMock.mockResolvedValue(page([]));

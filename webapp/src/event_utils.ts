@@ -228,7 +228,20 @@ export function formatEventTime(intl: IntlShape, event: EventSummary, hour12?: b
     return `${intl.formatDate(start, {month: 'short', day: 'numeric'})} ${startLabel} – ${intl.formatDate(end, {month: 'short', day: 'numeric'})} ${endLabel}`;
 }
 
+// spansDay reports whether the occurrence reaches past the day it is pinned to; those render as a
+// band across the calendar, so they lead every day's list to keep their band lane stable.
+function spansDay(occurrence: CalendarEventOccurrence): boolean {
+    const lastMoment = occurrence.endAt - 1;
+    const endKey = occurrence.event.allDay ? utcDateKey(lastMoment) : localDateKey(new Date(lastMoment));
+    return endKey > occurrence.dateKey;
+}
+
 export function compareEventOccurrences(a: CalendarEventOccurrence, b: CalendarEventOccurrence): number {
+    const bandA = spansDay(a) ? 0 : 1;
+    const bandB = spansDay(b) ? 0 : 1;
+    if (bandA !== bandB) {
+        return bandA - bandB;
+    }
     if (a.event.allDay !== b.event.allDay) {
         return a.event.allDay ? -1 : 1;
     }

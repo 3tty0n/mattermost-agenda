@@ -133,6 +133,16 @@ describe('eventOccurrencesForDays', () => {
         ].sort(compareEventOccurrences);
         expect(occurrences[0].event.id).toBe('all-day');
     });
+
+    it('sorts multi-day bands before single-day events so their lane stays stable', () => {
+        const timed = event({id: 'single'});
+        const band = event({id: 'band', title: 'Conference', startAt: new Date(2026, 0, 5, 9, 0).getTime(), endAt: new Date(2026, 0, 7, 10, 0).getTime()});
+        const occurrences = [
+            {event: timed, startAt: timed.startAt, endAt: timed.endAt, dateKey: '2026-01-06'},
+            {event: band, startAt: band.startAt, endAt: band.endAt, dateKey: '2026-01-06'},
+        ].sort(compareEventOccurrences);
+        expect(occurrences[0].event.id).toBe('band');
+    });
 });
 
 describe('formatEventTime', () => {

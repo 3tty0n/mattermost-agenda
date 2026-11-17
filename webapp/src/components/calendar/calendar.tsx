@@ -6,7 +6,7 @@ import {compareEventOccurrences, eventOccurrencesForDays, type CalendarEventOccu
 import {useEvents, useProfiles, useTasks} from 'hooks';
 import {type KeyboardEvent, useMemo, useRef, useState} from 'react';
 import {FormattedMessage, useIntl} from 'react-intl';
-import {compareOccurrences, occurrencesForTask, type CalendarOccurrence} from 'recurrence_utils';
+import {compareOccurrences, occurrencesForTask, utcDateKey, type CalendarOccurrence} from 'recurrence_utils';
 
 import CalendarCheckOutlineIcon from '@mattermost/compass-icons/components/calendar-check-outline';
 import ChevronLeftIcon from '@mattermost/compass-icons/components/chevron-left';
@@ -191,6 +191,16 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
         {id: 'tasks.calendar.event_count', defaultMessage: '{count, plural, =0 {No events} one {# event} other {# events}}'},
         {count},
     );
+
+    // A multi-day occurrence draws as one band: every day it covers renders its segment, the
+    // segments bleed to the cell edges so adjacent days connect, and only the event's true ends
+    // (or a week boundary) round off.
+    const eventFlow = (occurrence: CalendarEventOccurrence, key: string) => {
+        const lastMoment = occurrence.endAt - 1;
+        const startKey = occurrence.event.allDay ? utcDateKey(occurrence.startAt) : localDateKey(new Date(occurrence.startAt));
+        const endKey = occurrence.event.allDay ? utcDateKey(lastMoment) : localDateKey(new Date(lastMoment));
+        return {continuesLeft: startKey < key, continuesRight: endKey > key};
+    };
 
     const goTo = (nextCursor: Date, nextMode: CalendarMode = mode) => {
         setCursor(nextCursor);
@@ -453,7 +463,7 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                                 ))}
                             </div>
                             <div className='Tasks-Calendar__days'>
-                                {range.days.map((day) => {
+                                {range.days.map((day, dayIndex) => {
                                     const key = localDateKey(day);
                                     const dayTasks = tasksByDay.get(key) ?? [];
                                     const dayEvents = eventsByDay.get(key) ?? [];
@@ -484,6 +494,24 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                                                     {dayTasks.length}
                                                 </span>
                                             )}
+                                            {dayEvents.length > 0 && (
+                                                <span
+                                                    className='Tasks-Calendar__eventBars'
+                                                    aria-hidden='true'
+                                                >
+                                                    {dayEvents.slice(0, 2).map((occurrence) => {
+                                                        const {continuesLeft, continuesRight} = eventFlow(occurrence, key);
+                                                        const connectsLeft = continuesLeft && dayIndex % 7 > 0;
+                                                        const connectsRight = continuesRight && dayIndex % 7 < 6;
+                                                        return (
+                                                            <span
+                                                                key={`${occurrence.event.id}:${occurrence.dateKey}`}
+                                                                className={`Tasks-Calendar__eventBar${continuesLeft || continuesRight ? ' Tasks-Calendar__eventBar--flow' : ''}${connectsLeft ? ' Tasks-Calendar__eventBar--connectLeft' : ''}${connectsRight ? ' Tasks-Calendar__eventBar--connectRight' : ''}`}
+                                                            />
+                                                        );
+                                                    })}
+                                                </span>
+                                            )}
                                             {dayTasks.length > 0 && (
                                                 <span
                                                     className='Tasks-Calendar__dots'
@@ -493,19 +521,6 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                                                         <span
                                                             key={`${occurrence.task.id}:${occurrence.dueAt}`}
                                                             className={`Tasks-Calendar__dot Tasks-Calendar__dot--${occurrence.task.priority}`}
-                                                        />
-                                                    ))}
-                                                </span>
-                                            )}
-                                            {dayEvents.length > 0 && (
-                                                <span
-                                                    className='Tasks-Calendar__eventBars'
-                                                    aria-hidden='true'
-                                                >
-                                                    {dayEvents.slice(0, 2).map((occurrence) => (
-                                                        <span
-                                                            key={`${occurrence.event.id}:${occurrence.dateKey}`}
-                                                            className='Tasks-Calendar__eventBar'
                                                         />
                                                     ))}
                                                 </span>

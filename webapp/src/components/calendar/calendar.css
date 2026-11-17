@@ -196,6 +196,26 @@
     background: rgba(var(--button-bg-rgb), 0.56);
 }
 
+/* A multi-day event draws one continuous band across its days: every segment bleeds to the cell
+   edge, sides that connect to the neighbouring day reach into the 2px grid gap so they meet, and
+   the band rounds only at the event's true ends or at a week boundary. */
+.Tasks-Calendar__eventBar--flow {
+    width: auto;
+    margin-inline: -4px;
+}
+
+.Tasks-Calendar__eventBar--connectLeft {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    margin-left: -6px;
+}
+
+.Tasks-Calendar__eventBar--connectRight {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    margin-right: -6px;
+}
+
 .Tasks-Calendar__agenda {
     flex: none;
     margin-top: var(--spacing-s);
