@@ -1,7 +1,7 @@
-# Tasks for Mattermost
+# Agenda for Mattermost
 
-Tasks and a calendar that live inside Mattermost teams, channels and posts. No separate accounts, no
-external service, no second database.
+Agenda is tasks and a calendar that live inside Mattermost teams, channels and posts. No separate
+accounts, no external service, no second database.
 
 **Mattermost 11.7+** · Go server · React/TypeScript webapp
 
@@ -38,13 +38,13 @@ external service, no second database.
 ## Install
 
 1. Download `com.github.3tty0n.mattermost-tasks-*.tar.gz` from a release.
-2. In **System Console → Plugins → Plugin Management**, upload it and enable **Tasks**.
+2. In **System Console → Plugins → Plugin Management**, upload it and enable **Agenda**.
 
 Requires Mattermost 11.7.0+ (web or desktop; mobile does not load plugin UIs, use `/task` there).
 Release bundles are linux-amd64; maintainers can publish a macOS-inclusive one with
 `gh workflow run release.yml --ref main -f macos=true`. Everything is stored in the plugin KV store.
 
-**Settings** (System Console → Plugins → Tasks):
+**Settings** (System Console → Plugins → Agenda):
 
 | Setting | Default | Meaning |
 | --- | --- | --- |

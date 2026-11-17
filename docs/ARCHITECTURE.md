@@ -1,6 +1,7 @@
 # Architecture
 
-This document records the architecture decisions for the Tasks plugin. It is deliberately biased
+This document records the architecture decisions for the Agenda plugin (plugin ID
+`com.github.3tty0n.mattermost-tasks`). It is deliberately biased
 toward a small Mattermost deployment (one app node, 1 vCPU, 512 MB RAM) and a third-party plugin
 that cannot rely on internal server packages.
 

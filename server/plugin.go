@@ -108,13 +108,13 @@ func (p *Plugin) stopReminders() {
 	}
 }
 
-// ensureBot creates (or finds) the account that authors assignment DMs. A missing bot must not
-// prevent tasks from working, so the error is logged and notifications are simply skipped.
+// ensureBot creates (or finds) the account that authors assignment DMs and reminders. A missing
+// bot must not prevent tasks from working, so the error is logged and notifications are skipped.
 func (p *Plugin) ensureBot() string {
 	botUserID, err := p.client.Bot.EnsureBot(&model.Bot{
 		Username:    "tasks-bot",
-		DisplayName: "Tasks",
-		Description: "Sends task assignment notifications for the Tasks plugin.",
+		DisplayName: "Agenda",
+		Description: "Sends assignment notifications and reminders for the Agenda plugin.",
 	})
 	if err != nil {
 		p.client.Log.Error("Failed to ensure the task notification bot; assignment notifications are disabled", "error", err.Error())

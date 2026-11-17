@@ -1,7 +1,7 @@
 {
     "id": "com.github.3tty0n.mattermost-tasks",
-    "name": "Tasks",
-    "description": "Task management linked to Mattermost teams, channels, users and posts.",
+    "name": "Agenda",
+    "description": "Tasks and calendar events linked to Mattermost teams, channels, users and posts.",
     "homepage_url": "https://github.com/3tty0n/mattermost-tasks",
     "support_url": "https://github.com/3tty0n/mattermost-tasks/issues",
     "icon_path": "assets/tasks-icon.svg",
@@ -15,8 +15,8 @@
         "bundle_path": "webapp/dist/main.js"
     },
     "settings_schema": {
-        "header": "Tasks",
-        "footer": "Tasks inherit Mattermost team and channel permissions. Task content is never sent to an external service.",
+        "header": "Agenda",
+        "footer": "Agenda inherits Mattermost team and channel permissions. Task and event content is never sent to an external service.",
         "settings": [
             {
                 "key": "EnableAssignmentNotifications",

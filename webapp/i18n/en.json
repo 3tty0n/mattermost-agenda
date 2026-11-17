@@ -216,7 +216,7 @@
   "tasks.time.choose": "Choose time",
   "tasks.time.clock_hint": "Click a number, or type an exact time.",
   "tasks.time.open_clock": "Choose time",
-  "tasks.title": "Tasks",
+  "tasks.title": "Agenda",
   "tasks.editor.title_placeholder": "Task name",
   "tasks.editor.description_placeholder": "Description",
   "tasks.editor.markdown_tools": "Markdown formatting",

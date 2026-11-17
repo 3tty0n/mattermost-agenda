@@ -47,7 +47,7 @@ export default class Plugin {
         const title = (
             <FormattedMessage
                 id='tasks.title'
-                defaultMessage='Tasks'
+                defaultMessage='Agenda'
             />
         );
         const {showRHSPlugin, toggleRHSPlugin} = registry.registerRightHandSidebarComponent(TasksSidebar, title);
