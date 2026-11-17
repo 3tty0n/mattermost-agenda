@@ -137,6 +137,13 @@
     border-top: 1px solid rgba(var(--center-channel-color-rgb), 0.08);
 }
 
+/* The delete-scope choice stacks above the confirm button in the narrow dialog. */
+.Tasks-EventEditor__danger--options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-s);
+}
+
 /* A long team or channel name is truncated instead of widening the dialog. */
 .Tasks-EventEditor__scopeSummary {
     min-width: 0;

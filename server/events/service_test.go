@@ -349,6 +349,57 @@ func TestSeriesUpdatePrunesStaleOverrides(t *testing.T) {
 	assert.Empty(t, updated.Overrides)
 }
 
+func TestSeriesUpdateUntilDropsLaterOverrides(t *testing.T) {
+	env := newTestEnv(t)
+	teamID, channelID := mmodel.NewId(), mmodel.NewId()
+	creatorID := mmodel.NewId()
+	allowChannel(env.api, creatorID, channelID, teamID)
+	denyAdmin(env.api, creatorID)
+
+	// Weekly standup on Wednesdays 10:00 UTC: Jan 7, 14, 21, …
+	start := time.Date(2026, time.January, 7, 10, 0, 0, 0, time.UTC).UnixMilli()
+	event, err := env.service.Create(nil, "/events", creatorID, taskmodel.CreateEventInput{
+		ChannelID:  channelID,
+		Visibility: taskmodel.TaskVisibilityChannel,
+		Title:      "Standup",
+		StartAt:    start,
+		EndAt:      start + 3600_000,
+		TimeZone:   "UTC",
+		Recurrence: &taskmodel.EventRecurrence{Frequency: taskmodel.EventRecurrenceWeekly, Weekdays: []int{3}},
+	})
+	require.NoError(t, err)
+
+	// The first occurrence is moved, the second cancelled, so both carry overrides.
+	second := start + 7*24*3600_000
+	firstMoved := time.Date(2026, time.January, 6, 9, 0, 0, 0, time.UTC).UnixMilli()
+	firstMovedEnd := firstMoved + 3600_000
+	updated, err := env.service.Update(nil, "/events", creatorID, event.ID, taskmodel.EventPatch{
+		OccurrenceStartAt: &start,
+		StartAt:           &firstMoved,
+		EndAt:             &firstMovedEnd,
+	})
+	require.NoError(t, err)
+	cancelled := true
+	updated, err = env.service.Update(nil, "/events", creatorID, event.ID, taskmodel.EventPatch{
+		OccurrenceStartAt:   &second,
+		OccurrenceCancelled: &cancelled,
+	})
+	require.NoError(t, err)
+	require.Len(t, updated.Overrides, 2)
+
+	// Deleting "this and following" from the second occurrence ends the series the day before it:
+	// earlier slots and their overrides survive, later overrides no longer name a slot.
+	updated, err = env.service.Update(nil, "/events", creatorID, event.ID, taskmodel.EventPatch{
+		Recurrence: &taskmodel.EventRecurrence{Frequency: taskmodel.EventRecurrenceWeekly, Weekdays: []int{3}, Until: "2026-01-13"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "2026-01-13", updated.Recurrence.Until)
+	assert.Equal(t, start, updated.StartAt)
+	require.Len(t, updated.Overrides, 1)
+	assert.Equal(t, start, updated.Overrides[0].OriginalStart)
+	assert.Equal(t, firstMoved, updated.Overrides[0].StartAt)
+}
+
 func TestEventLocationIsTrimmedLimitedAndClearable(t *testing.T) {
 	env := newTestEnv(t)
 	teamID, channelID := mmodel.NewId(), mmodel.NewId()

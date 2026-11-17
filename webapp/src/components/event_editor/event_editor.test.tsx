@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import {fireEvent, screen, waitFor} from '@testing-library/react';
+import {fireEvent, screen, waitFor, within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {createEvent, deleteEvent, fetchAssignees, getEvent, getProfilePictureUrl, getProfiles, updateEvent} from 'client';
 
@@ -178,6 +178,30 @@ describe('EventEditor', () => {
         const picked = createEventMock.mock.calls[0][0];
         expect(new Date(picked.startAt).toISOString().slice(0, 10)).toBe('2026-01-20');
         expect(picked.endAt - picked.startAt).toBe(90 * 60 * 1000);
+    });
+
+    it('keeps the event length when a start is picked on an edit', async () => {
+        const user = userEvent.setup();
+        renderWithStore(
+            <EventEditor
+                eventId='event-1'
+                defaultDurationMinutes={90}
+                onClose={jest.fn()}
+                onSaved={jest.fn()}
+            />,
+        );
+
+        await screen.findByDisplayValue('Sprint planning');
+        await user.click(screen.getByRole('button', {name: 'Pick start date and time'}));
+        await user.click(screen.getByRole('button', {name: /January 20, 2026/}));
+        await user.click(screen.getByRole('button', {name: 'OK'}));
+        await user.click(screen.getByRole('button', {name: 'Save'}));
+        await waitFor(() => expect(updateEventMock).toHaveBeenCalledTimes(1));
+        const picked = updateEventMock.mock.calls[0][1];
+        expect(new Date(picked.startAt ?? 0).toISOString().slice(0, 10)).toBe('2026-01-20');
+
+        // The event's own hour survives; the default duration does not apply.
+        expect((picked.endAt ?? 0) - (picked.startAt ?? 0)).toBe(3600000);
     });
 
     it('creates a daily recurring event until a date', async () => {
@@ -530,6 +554,32 @@ describe('EventEditor', () => {
             })));
         });
 
+        it('keeps the occurrence length when a new start is picked', async () => {
+            const user = userEvent.setup();
+            getEventMock.mockResolvedValue(recurringSaved);
+            renderWithStore(
+                <EventEditor
+                    eventId='event-1'
+                    occurrenceStartAt={nextOccurrence}
+                    defaultDurationMinutes={90}
+                    onClose={jest.fn()}
+                    onSaved={jest.fn()}
+                />,
+            );
+
+            await screen.findByRole('group', {name: 'Apply changes to'});
+            await user.click(screen.getByRole('button', {name: 'Pick start date and time'}));
+            await user.click(screen.getByRole('button', {name: /January 20, 2026/}));
+            await user.click(screen.getByRole('button', {name: 'OK'}));
+            await user.click(screen.getByRole('button', {name: 'Save'}));
+            await waitFor(() => expect(updateEventMock).toHaveBeenCalledWith('event-1', expect.objectContaining({
+                occurrenceStartAt: nextOccurrence,
+            })));
+            const patch = updateEventMock.mock.calls[0][1];
+            expect(new Date(patch.startAt ?? 0).toISOString().slice(0, 10)).toBe('2026-01-20');
+            expect((patch.endAt ?? 0) - (patch.startAt ?? 0)).toBe(3600000);
+        });
+
         it('deletes a single occurrence by cancelling it', async () => {
             const user = userEvent.setup();
             const onDeleted = jest.fn();
@@ -553,6 +603,58 @@ describe('EventEditor', () => {
             }));
             expect(deleteEventMock).not.toHaveBeenCalled();
             expect(onDeleted).toHaveBeenCalled();
+        });
+
+        it('ends the series before the occurrence when "this and following" is chosen', async () => {
+            const user = userEvent.setup();
+            const onSaved = jest.fn();
+            getEventMock.mockResolvedValue(recurringSaved);
+            updateEventMock.mockResolvedValue(recurringSaved);
+            renderWithStore(
+                <EventEditor
+                    eventId='event-1'
+                    occurrenceStartAt={nextOccurrence}
+                    onClose={jest.fn()}
+                    onSaved={onSaved}
+                    onDeleted={jest.fn()}
+                />,
+            );
+
+            await screen.findByRole('group', {name: 'Apply changes to'});
+            await user.click(screen.getByRole('button', {name: 'Delete this event'}));
+            const choices = screen.getByRole('group', {name: 'Delete which events'});
+            await user.click(within(choices).getByRole('button', {name: 'This and following events'}));
+            await user.click(screen.getByRole('button', {name: 'Confirm delete'}));
+            await waitFor(() => expect(updateEventMock).toHaveBeenCalledWith('event-1', expect.objectContaining({
+                title: 'Sprint planning',
+                startAt: start,
+                endAt: end,
+                recurrence: {frequency: 'weekly', interval: 1, weekdays: [1], until: '2026-01-11'},
+            })));
+            expect(onSaved).toHaveBeenCalledWith(recurringSaved);
+            expect(deleteEventMock).not.toHaveBeenCalled();
+        });
+
+        it('deletes the whole series when "All events" is chosen', async () => {
+            const user = userEvent.setup();
+            getEventMock.mockResolvedValue(recurringSaved);
+            renderWithStore(
+                <EventEditor
+                    eventId='event-1'
+                    occurrenceStartAt={nextOccurrence}
+                    onClose={jest.fn()}
+                    onSaved={jest.fn()}
+                    onDeleted={jest.fn()}
+                />,
+            );
+
+            await screen.findByRole('group', {name: 'Apply changes to'});
+            await user.click(screen.getByRole('button', {name: 'Delete this event'}));
+            const choices = screen.getByRole('group', {name: 'Delete which events'});
+            await user.click(within(choices).getByRole('button', {name: 'All events'}));
+            await user.click(screen.getByRole('button', {name: 'Confirm delete'}));
+            await waitFor(() => expect(deleteEventMock).toHaveBeenCalledWith('event-1'));
+            expect(updateEventMock).not.toHaveBeenCalled();
         });
     });
 });

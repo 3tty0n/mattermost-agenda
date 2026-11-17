@@ -114,6 +114,10 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
+
+    // Which part of a recurring series the delete applies to: the clicked occurrence, it and every
+    // later one, or the whole series.
+    const [deleteScope, setDeleteScope] = useState<'occurrence'|'following'|'series'>(occurrenceStartAt ? 'occurrence' : 'series');
     const [error, setError] = useState<string>();
     const [preview, setPreview] = useState(false);
 
@@ -248,6 +252,18 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
             return {startAt: override.startAt, endAt: override.endAt};
         }
         return {startAt: occurrenceStartAt, endAt: occurrenceStartAt + (event.endAt - event.startAt)};
+    };
+
+    // "This and following" ends the series the civil day before this occurrence's slot, in the zone
+    // the slot math runs in: UTC for all-day events, the event's zone otherwise. The server then
+    // prunes the overrides whose slots no longer exist.
+    const followingDeleteUntil = () => {
+        if (!event || !occurrenceStartAt) {
+            return '';
+        }
+        const zone = event.allDay ? 'UTC' : (event.timezone || machineTimeZone());
+        const parts = epochToZonedParts(occurrenceStartAt, zone);
+        return toDateInput(Date.UTC(parts.year, parts.month - 1, parts.day - 1));
     };
 
     // In "this event only" mode the shared fields are disabled: the server rejects anything but a
@@ -396,6 +412,15 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
         };
     };
 
+    // The event's own length from the inputs, so moving the start keeps it.
+    const currentDurationMs = () => {
+        const times = currentWallTimes();
+        if (!times?.startAt || !times.endAt || times.endAt <= times.startAt) {
+            return undefined;
+        }
+        return times.endAt - times.startAt;
+    };
+
     const changeTimeZone = (next: string) => {
         if (allDay || !isValidTimeZone(next)) {
             setTimeZone(next);
@@ -477,8 +502,10 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
         const dateText = formatDateInput({year: parts.year, month: parts.month, day: parts.day});
         const clockText = formatTimeInput(parts.hour, parts.minute, Boolean(hour12));
         if (which === 'start') {
-            // Picking a start moves the end to the default duration after it.
-            const endParts = epochToZonedParts(value + durationMs, zone);
+            // Picking a start moves the end with it: an edited event keeps its own length, a new
+            // one gets the default duration.
+            const keptDuration = event ? currentDurationMs() : undefined;
+            const endParts = epochToZonedParts(value + (keptDuration ?? durationMs), zone);
             setStartDate(dateText);
             setStartTime(clockText);
             setEndDate(formatDateInput({year: endParts.year, month: endParts.month, day: endParts.day}));
@@ -694,12 +721,32 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
         setDeleting(true);
         setError(undefined);
         try {
-            if (timeOnly && occurrenceStartAt) {
+            if (occurrenceEdit && deleteScope === 'occurrence' && occurrenceStartAt) {
                 await updateEvent(event.id, {occurrenceStartAt, occurrenceCancelled: true});
+                onDeleted?.();
+            } else if (occurrenceEdit && deleteScope === 'following' && occurrenceStartAt && event.recurrence) {
+                // Ending the series before this occurrence deletes it and every later one; the
+                // server keeps the earlier slots and their overrides intact.
+                const updated = await updateEvent(event.id, {
+                    title: event.title,
+                    description: event.description ?? '',
+                    location: event.location ?? '',
+                    teamId: event.teamId,
+                    channelId: event.channelId ?? '',
+                    visibility: event.visibility,
+                    assigneeIds: event.assigneeIds ?? [],
+                    startAt: event.startAt,
+                    endAt: event.endAt,
+                    allDay: Boolean(event.allDay),
+                    timezone: event.timezone,
+                    recurrence: {...event.recurrence, until: followingDeleteUntil()},
+                    reminders: event.reminders ?? [],
+                });
+                onSaved(updated);
             } else {
                 await deleteEvent(event.id);
+                onDeleted?.();
             }
-            onDeleted?.();
         } catch (err) {
             setDeleting(false);
             setError(err instanceof Error ? err.message : String(err));
@@ -707,22 +754,52 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
     };
 
     // Delete lives at the end of the form, not in the footer: the narrow dialog has no room for three
-    // footer buttons.
+    // footer buttons. On a recurring series the confirm step first asks which part to delete.
+    const deleteScopeOptions: Record<typeof deleteScope, {id: string; defaultMessage: string}> = {
+        occurrence: {id: 'tasks.event.delete_scope_occurrence', defaultMessage: 'This event only'},
+        following: {id: 'tasks.event.delete_scope_following', defaultMessage: 'This and following events'},
+        series: {id: 'tasks.event.delete_scope_series', defaultMessage: 'All events'},
+    };
     let deleteAction: ReactNode = null;
     if (canModify && canDelete) {
         deleteAction = confirmDelete ? (
-            <Button
-                emphasis='primary'
-                size='small'
-                destructive={true}
-                loading={deleting}
-                onClick={remove}
-            >
-                <FormattedMessage
-                    id='tasks.event.confirm_delete'
-                    defaultMessage='Confirm delete'
-                />
-            </Button>
+            <>
+                {occurrenceEdit && (
+                    <div
+                        className='Tasks-TaskEditor__quickOptions'
+                        role='group'
+                        aria-label={intl.formatMessage({id: 'tasks.event.delete_scope', defaultMessage: 'Delete which events'})}
+                    >
+                        {(['occurrence', 'following', 'series'] as const).map((value) => (
+                            <button
+                                key={value}
+                                type='button'
+                                className={`Tasks-TaskEditor__quickOption${deleteScope === value ? ' Tasks-TaskEditor__quickOption--selected' : ''}`}
+                                aria-pressed={deleteScope === value}
+                                disabled={deleting}
+                                onClick={() => setDeleteScope(value)}
+                            >
+                                <FormattedMessage
+                                    id={deleteScopeOptions[value].id}
+                                    defaultMessage={deleteScopeOptions[value].defaultMessage}
+                                />
+                            </button>
+                        ))}
+                    </div>
+                )}
+                <Button
+                    emphasis='primary'
+                    size='small'
+                    destructive={true}
+                    loading={deleting}
+                    onClick={remove}
+                >
+                    <FormattedMessage
+                        id='tasks.event.confirm_delete'
+                        defaultMessage='Confirm delete'
+                    />
+                </Button>
+            </>
         ) : (
             <Button
                 emphasis='tertiary'
@@ -1393,7 +1470,7 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
                     </div>
 
                     {deleteAction && (
-                        <div className='Tasks-EventEditor__danger'>
+                        <div className={`Tasks-EventEditor__danger${occurrenceEdit && confirmDelete ? ' Tasks-EventEditor__danger--options' : ''}`}>
                             {deleteAction}
                         </div>
                     )}
