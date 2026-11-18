@@ -563,6 +563,24 @@ func TestEventAPILifecycle(t *testing.T) {
 	body = `{"occurrenceStartAt":` + strconv.FormatInt(occurrenceStart, 10) + `,"title":"nope"}`
 	w = env.serve(http.MethodPost, "/api/v1/events/"+created.ID, body, creatorID)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	body = `{"occurrenceStartAt":` + strconv.FormatInt(occurrenceStart, 10) + `,"color":"#e8534a"}`
+	w = env.serve(http.MethodPost, "/api/v1/events/"+created.ID, body, creatorID)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// An event keeps its own color: set, normalized, echoed by the summary and clearable.
+	w = env.serve(http.MethodPatch, "/api/v1/events/"+created.ID, `{"color":"#E8534A"}`, creatorID)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, "#e8534a", decodeResponse[taskmodel.Event](t, w).Color)
+	w = env.serve(http.MethodGet, rangeQuery, "", creatorID)
+	require.Equal(t, http.StatusOK, w.Code)
+	result = decodeResponse[events.EventListResult](t, w)
+	require.Len(t, result.Items, 1)
+	assert.Equal(t, "#e8534a", result.Items[0].Color)
+	w = env.serve(http.MethodPatch, "/api/v1/events/"+created.ID, `{"color":"nope"}`, creatorID)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	w = env.serve(http.MethodPatch, "/api/v1/events/"+created.ID, `{"color":""}`, creatorID)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Empty(t, decodeResponse[taskmodel.Event](t, w).Color)
 
 	w = env.serve(http.MethodDelete, "/api/v1/events/"+created.ID, "", creatorID)
 	require.Equal(t, http.StatusNoContent, w.Code, w.Body.String())
@@ -571,4 +589,9 @@ func TestEventAPILifecycle(t *testing.T) {
 
 	w = env.serve(http.MethodPost, "/api/v1/events", `{"channelId":"`+channelID+`","title":"Bad","startAt":`+strconv.FormatInt(end, 10)+`,"endAt":`+strconv.FormatInt(start, 10)+`}`, creatorID)
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// A color set at creation is stored in its normalized form.
+	w = env.serve(http.MethodPost, "/api/v1/events", `{"channelId":"`+channelID+`","title":"Colored","startAt":`+strconv.FormatInt(start, 10)+`,"endAt":`+strconv.FormatInt(end, 10)+`,"color":"#8968CD"}`, creatorID)
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	assert.Equal(t, "#8968cd", decodeResponse[taskmodel.Event](t, w).Color)
 }

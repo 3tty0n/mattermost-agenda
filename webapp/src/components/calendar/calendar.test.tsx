@@ -315,6 +315,7 @@ describe('Calendar', () => {
                 startAt: todayAt(12),
                 endAt: todayAt(13),
                 allDay: false,
+                color: '#8968cd',
                 timezone: 'UTC',
                 createdAt: 1,
                 updatedAt: 1,
@@ -340,6 +341,10 @@ describe('Calendar', () => {
         const dots = container.querySelectorAll('.Tasks-Calendar__dot');
         expect(dots[0]).not.toHaveClass('Tasks-Calendar__dot--mine');
         expect(dots[1]).toHaveClass('Tasks-Calendar__dot--mine');
+
+        // An event with its own color carries it to the calendar surfaces.
+        const bars = container.querySelectorAll<HTMLElement>('.Tasks-Calendar__eventBar');
+        expect(bars[1].style.getPropertyValue('--Tasks-ItemColor')).toBe('#8968cd');
 
         // Picking a color stores it for the signed-in user.
         await user.click(screen.getByRole('button', {name: 'Calendar colors'}));

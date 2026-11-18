@@ -107,6 +107,10 @@ func (s *EventService) Create(c *plugin.Context, path, actorID string, input mod
 	if err != nil {
 		return nil, err
 	}
+	color, err := model.NormalizeColor(input.Color)
+	if err != nil {
+		return nil, err
+	}
 	timeZone, err := model.NormalizeTimeZone(input.TimeZone)
 	if err != nil {
 		return nil, err
@@ -163,6 +167,7 @@ func (s *EventService) Create(c *plugin.Context, path, actorID string, input mod
 		Title:       title,
 		Description: description,
 		Location:    location,
+		Color:       color,
 		StartAt:     startAt,
 		EndAt:       endAt,
 		AllDay:      input.AllDay,
@@ -411,6 +416,13 @@ func (s *EventService) Update(c *plugin.Context, path, actorID, eventID string, 
 			}
 			current.Location = location
 		}
+		if patch.Color != nil {
+			color, colorErr := model.NormalizeColor(*patch.Color)
+			if colorErr != nil {
+				return nil, colorErr
+			}
+			current.Color = color
+		}
 		current.Visibility = newVisibility
 		current.TeamID = newTeam
 		current.ChannelID = newChannel
@@ -463,7 +475,7 @@ func (s *EventService) Update(c *plugin.Context, path, actorID, eventID string, 
 // so a patch that touches them is rejected instead of being silently applied to the whole series.
 func (s *EventService) applyOccurrencePatch(current *model.Event, patch model.EventPatch) (*model.Event, error) {
 	if patch.TeamID != nil || patch.ChannelID != nil || patch.Visibility != nil || patch.Title != nil ||
-		patch.Description != nil || patch.Location != nil || patch.AssigneeIDs != nil ||
+		patch.Description != nil || patch.Location != nil || patch.Color != nil || patch.AssigneeIDs != nil ||
 		patch.AllDay != nil || patch.TimeZone != nil || patch.Recurrence != nil || patch.Reminders != nil {
 		return nil, fmt.Errorf("%w: a single occurrence can only be moved or cancelled", model.ErrInvalid)
 	}

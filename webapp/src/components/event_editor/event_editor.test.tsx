@@ -496,6 +496,42 @@ describe('EventEditor', () => {
         await waitFor(() => expect(updateEventMock).toHaveBeenCalledWith('event-1', expect.objectContaining({reminders: []})));
     });
 
+    it('saves a color picked in the editor', async () => {
+        const user = userEvent.setup();
+        getEventMock.mockResolvedValue({...savedEvent, color: '#4f7bd9'});
+        renderWithStore(
+            <EventEditor
+                eventId='event-1'
+                onClose={jest.fn()}
+                onSaved={jest.fn()}
+            />,
+        );
+
+        await screen.findByDisplayValue('Sprint planning');
+        await user.click(screen.getByRole('button', {name: 'Event color'}));
+        await user.click(screen.getByRole('button', {name: 'Set the Event color color to #e8534a'}));
+        await user.click(screen.getByRole('button', {name: 'Save'}));
+        await waitFor(() => expect(updateEventMock).toHaveBeenCalledWith('event-1', expect.objectContaining({color: '#e8534a'})));
+    });
+
+    it('clears the color back to the default', async () => {
+        const user = userEvent.setup();
+        getEventMock.mockResolvedValue({...savedEvent, color: '#4f7bd9'});
+        renderWithStore(
+            <EventEditor
+                eventId='event-1'
+                onClose={jest.fn()}
+                onSaved={jest.fn()}
+            />,
+        );
+
+        await screen.findByDisplayValue('Sprint planning');
+        await user.click(screen.getByRole('button', {name: 'Event color'}));
+        await user.click(screen.getByRole('button', {name: 'Default color'}));
+        await user.click(screen.getByRole('button', {name: 'Save'}));
+        await waitFor(() => expect(updateEventMock).toHaveBeenCalledWith('event-1', expect.objectContaining({color: ''})));
+    });
+
     describe('with an occurrence of a recurring series', () => {
         const recurringSaved: Event = {
             ...savedEvent,

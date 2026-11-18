@@ -23,6 +23,7 @@ type Event struct {
 	Title       string           `json:"title"`
 	Description string           `json:"description,omitempty"`
 	Location    string           `json:"location,omitempty"`
+	Color       string           `json:"color,omitempty"`
 	StartAt     int64            `json:"startAt"`
 	EndAt       int64            `json:"endAt"`
 	AllDay      bool             `json:"allDay,omitempty"`
@@ -69,6 +70,7 @@ type EventRef struct {
 	AssigneeIDs []string         `json:"a,omitempty"`
 	Title       string           `json:"n"`
 	Location    string           `json:"l,omitempty"`
+	Color       string           `json:"col,omitempty"`
 	StartAt     int64            `json:"s"`
 	EndAt       int64            `json:"e"`
 	AllDay      bool             `json:"d,omitempty"`
@@ -100,6 +102,7 @@ func (e *Event) Ref() EventRef {
 		AssigneeIDs: slices.Clone(e.AssigneeIDs),
 		Title:       truncateRunes(e.Title, MaxTitleRunes),
 		Location:    e.Location,
+		Color:       e.Color,
 		StartAt:     e.StartAt,
 		EndAt:       e.EndAt,
 		AllDay:      e.AllDay,
@@ -123,6 +126,7 @@ type EventSummary struct {
 	AssigneeIDs []string         `json:"assigneeIds"`
 	Title       string           `json:"title"`
 	Location    string           `json:"location,omitempty"`
+	Color       string           `json:"color,omitempty"`
 	StartAt     int64            `json:"startAt"`
 	EndAt       int64            `json:"endAt"`
 	AllDay      bool             `json:"allDay,omitempty"`
@@ -151,6 +155,7 @@ func (r EventRef) Summary() EventSummary {
 		}(),
 		Title:      r.Title,
 		Location:   r.Location,
+		Color:      r.Color,
 		StartAt:    r.StartAt,
 		EndAt:      r.EndAt,
 		AllDay:     r.AllDay,
@@ -171,6 +176,7 @@ type CreateEventInput struct {
 	Title       string
 	Description string
 	Location    string
+	Color       string
 	AssigneeIDs []string
 	StartAt     int64
 	EndAt       int64
@@ -189,6 +195,7 @@ type EventPatch struct {
 	Title               *string
 	Description         *string
 	Location            *string
+	Color               *string
 	AssigneeIDs         *[]string
 	StartAt             *int64
 	EndAt               *int64
@@ -203,7 +210,7 @@ type EventPatch struct {
 // IsZero reports whether the patch changes nothing.
 func (p EventPatch) IsZero() bool {
 	return p.TeamID == nil && p.ChannelID == nil && p.Visibility == nil && p.Title == nil &&
-		p.Description == nil && p.Location == nil && p.AssigneeIDs == nil && p.StartAt == nil && p.EndAt == nil && p.AllDay == nil && p.TimeZone == nil && p.Recurrence == nil && p.Reminders == nil &&
+		p.Description == nil && p.Location == nil && p.Color == nil && p.AssigneeIDs == nil && p.StartAt == nil && p.EndAt == nil && p.AllDay == nil && p.TimeZone == nil && p.Recurrence == nil && p.Reminders == nil &&
 		p.OccurrenceStartAt == nil && p.OccurrenceCancelled == nil
 }
 

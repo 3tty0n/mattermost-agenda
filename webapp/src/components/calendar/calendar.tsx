@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import {calendarColorVars} from 'calendar_colors';
+import {calendarColorVars, itemColorVars} from 'calendar_colors';
 import {addLocalDays, calendarQueryBounds, calendarRange, localDateKey, startOfLocalDay, startOfWeek, weekStartsOn, type CalendarMode} from 'calendar_utils';
 import {compareEventOccurrences, eventOccurrencesForDays, type CalendarEventOccurrence} from 'event_utils';
 import {useCalendarColors, useEvents, useProfiles, useTasks} from 'hooks';
@@ -301,6 +301,7 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                     event={occurrence.event}
                     occurrenceStartAt={occurrence.originalStart}
                     mine={isMine(occurrence.event.creatorId)}
+                    color={occurrence.event.color}
                     profiles={profiles}
                     onOpen={onOpenEvent}
                 />
@@ -532,6 +533,7 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                                                             <span
                                                                 key={`${occurrence.event.id}:${occurrence.dateKey}`}
                                                                 className={`Tasks-Calendar__eventBar${isMine(occurrence.event.creatorId) ? ' Tasks-Calendar__eventBar--mine' : ''}${continuesLeft || continuesRight ? ' Tasks-Calendar__eventBar--flow' : ''}${connectsLeft ? ' Tasks-Calendar__eventBar--connectLeft' : ''}${connectsRight ? ' Tasks-Calendar__eventBar--connectRight' : ''}`}
+                                                                style={itemColorVars(occurrence.event.color)}
                                                             />
                                                         );
                                                     })}

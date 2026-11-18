@@ -72,4 +72,18 @@ describe('EventCalendarCard location', () => {
         const {container} = renderCard(undefined, jest.fn(), undefined, true);
         expect(container.querySelector('.Tasks-EventCard')).toHaveClass('Tasks-EventCard--mine');
     });
+
+    it('carries an event\'s own color for the calendar surfaces', () => {
+        const {container} = renderWithStore(
+            <EventCalendarCard
+                event={event(undefined)}
+                color='#e8534a'
+                profiles={{}}
+                onOpen={jest.fn()}
+            />,
+        );
+        const card = container.querySelector<HTMLElement>('.Tasks-EventCard');
+        expect(card?.style.getPropertyValue('--Tasks-ItemColor')).toBe('#e8534a');
+        expect(card?.style.getPropertyValue('--Tasks-ItemColorRgb')).toBe('232, 83, 74');
+    });
 });

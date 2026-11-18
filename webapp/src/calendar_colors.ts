@@ -25,6 +25,20 @@ function hexToRgbTriplet(value: string): string | undefined {
     return `${(raw >> 16) & 255}, ${(raw >> 8) & 255}, ${raw & 255}`;
 }
 
+// itemColorVars turns a single item's color into the CSS custom properties its calendar surfaces
+// read. An unset color returns nothing so the element falls back to the mine/team defaults.
+export function itemColorVars(color?: string): CSSProperties {
+    if (!color) {
+        return {};
+    }
+    const vars: Record<string, string> = {'--Tasks-ItemColor': color};
+    const rgb = hexToRgbTriplet(color);
+    if (rgb) {
+        vars['--Tasks-ItemColorRgb'] = rgb;
+    }
+    return vars as CSSProperties;
+}
+
 // calendarColorVars turns the stored colors into CSS custom properties for the calendar root. A
 // color that is unset falls through to the defaults declared in calendar.css, so the theme accent
 // keeps driving the user's own items until they pick something else.

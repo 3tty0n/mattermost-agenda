@@ -101,10 +101,8 @@ export default function CalendarColorSettings({colors, disabled, onChange}: Prop
                             aria-pressed={selected === preset}
                             aria-label={intl.formatMessage(
                                 {id: 'tasks.calendar.colors.select', defaultMessage: 'Set the {which} color to {value}'},
-                                {which: intl.formatMessage(row === 'mine' ?
-                                    {id: 'tasks.calendar.colors.mine', defaultMessage: 'My items'} :
-                                    {id: 'tasks.calendar.colors.team', defaultMessage: 'Team items'}),
-                                value: preset},
+                                {which: intl.formatMessage(row === 'mine' ? {id: 'tasks.calendar.colors.mine', defaultMessage: 'My items'} : {id: 'tasks.calendar.colors.team', defaultMessage: 'Team items'}),
+                                    value: preset},
                             )}
                             onClick={() => select(row, preset)}
                         />
@@ -117,9 +115,7 @@ export default function CalendarColorSettings({colors, disabled, onChange}: Prop
                             value={(/^#[0-9a-f]{6}$/i).test(selected) ? selected : DEFAULT_CALENDAR_COLOR.team}
                             aria-label={intl.formatMessage(
                                 {id: 'tasks.calendar.colors.custom', defaultMessage: 'Pick a custom color for {which}'},
-                                {which: intl.formatMessage(row === 'mine' ?
-                                    {id: 'tasks.calendar.colors.mine', defaultMessage: 'My items'} :
-                                    {id: 'tasks.calendar.colors.team', defaultMessage: 'Team items'})},
+                                {which: intl.formatMessage(row === 'mine' ? {id: 'tasks.calendar.colors.mine', defaultMessage: 'My items'} : {id: 'tasks.calendar.colors.team', defaultMessage: 'Team items'})},
                             )}
                             onChange={(changeEvent) => select(row, changeEvent.target.value.toLowerCase())}
                         />
@@ -129,9 +125,7 @@ export default function CalendarColorSettings({colors, disabled, onChange}: Prop
                         className='Tasks-CalendarColorSettings__default'
                         aria-label={intl.formatMessage(
                             {id: 'tasks.calendar.colors.reset', defaultMessage: 'Reset the {which} color'},
-                            {which: intl.formatMessage(row === 'mine' ?
-                                {id: 'tasks.calendar.colors.mine', defaultMessage: 'My items'} :
-                                {id: 'tasks.calendar.colors.team', defaultMessage: 'Team items'})},
+                            {which: intl.formatMessage(row === 'mine' ? {id: 'tasks.calendar.colors.mine', defaultMessage: 'My items'} : {id: 'tasks.calendar.colors.team', defaultMessage: 'Team items'})},
                         )}
                         onClick={() => select(row, '')}
                     >

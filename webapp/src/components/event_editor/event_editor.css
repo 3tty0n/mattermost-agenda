@@ -21,6 +21,80 @@
     min-width: 0;
 }
 
+/* The color property keeps its trigger compact: a small dot when a color is set, words when not. */
+.Tasks-EventEditor__colorChoice {
+    display: inline-flex;
+    align-items: center;
+}
+
+.Tasks-EventEditor__colorDot {
+    width: 10px;
+    height: 10px;
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+    border-radius: var(--radius-pill);
+}
+
+.Tasks-EventEditor__colorSwatches {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-xxs);
+}
+
+.Tasks-EventEditor__colorSwatch {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+}
+
+.Tasks-EventEditor__colorSwatch--selected,
+.Tasks-EventEditor__colorSwatch:focus-visible {
+    outline: 2px solid rgba(var(--button-bg-rgb), 0.56);
+    outline-offset: 1px;
+}
+
+.Tasks-EventEditor__colorCustom {
+    display: inline-flex;
+    padding: 2px;
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+    border-radius: var(--radius-s);
+    cursor: pointer;
+}
+
+.Tasks-EventEditor__colorCustom--selected {
+    border-color: rgba(var(--button-bg-rgb), 0.56);
+}
+
+.Tasks-EventEditor__colorCustom input[type='color'] {
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-s);
+    background: none;
+    cursor: pointer;
+}
+
+.Tasks-EventEditor__colorDefault {
+    padding: var(--spacing-xxxs) var(--spacing-xs);
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+    border-radius: var(--radius-pill);
+    background: var(--center-channel-bg);
+    color: rgba(var(--center-channel-color-rgb), 0.72);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: var(--font-size-50);
+    line-height: var(--line-height-50);
+}
+
+.Tasks-EventEditor__colorDefault:hover {
+    border-color: rgba(var(--button-bg-rgb), 0.56);
+    color: var(--button-bg);
+}
+
 .Tasks-EventEditor__label {
     color: rgba(var(--center-channel-color-rgb), 0.72);
     font-size: var(--font-size-75);

@@ -16,8 +16,8 @@ accounts, no external service, no second database.
 - **Tasks:** list, board (drag between Todo / In progress / Done) and calendar views; manual
   ordering; priorities; Markdown descriptions; filters and sorting.
 - **Events:** calendar appointments, separate from tasks (no checkbox or priority). Timed or all-day,
-  with participants, an optional **location** (a Zoom/Meet URL becomes a link on the card) and a
-  time zone.
+  with participants, an optional **location** (a Zoom/Meet URL becomes a link on the card), a
+  time zone and an optional per-event **calendar color**.
 - **Repeating:** daily, weekly (chosen weekdays), monthly, yearly or custom, with an optional end
   date. Completing a repeating task moves it to its next date. Individual occurrences of a repeating
   event can be moved or cancelled without changing the series.

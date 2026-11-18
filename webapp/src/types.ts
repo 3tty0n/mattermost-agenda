@@ -80,6 +80,7 @@ export type Event = {
     title: string;
     description?: string;
     location?: string;
+    color?: string;
     startAt: number;
     endAt: number;
     allDay?: boolean;
@@ -112,6 +113,7 @@ export type CreateEventInput = {
     title: string;
     description?: string;
     location?: string;
+    color?: string;
     startAt: number;
     endAt: number;
     allDay?: boolean;
@@ -128,6 +130,7 @@ export type UpdateEventInput = {
     title?: string;
     description?: string;
     location?: string;
+    color?: string;
     startAt?: number;
     endAt?: number;
     allDay?: boolean;

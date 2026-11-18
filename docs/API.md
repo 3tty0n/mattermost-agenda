@@ -242,6 +242,9 @@ Create body:
   midnight.
 - `location` is optional free text (up to 2048 characters), typically a meeting URL. The webapp
   links it only when it is an `http(s)` URL. Send `""` on update to clear it.
+- `color` is an optional `#rrggbb` calendar color for this one event (lowercase on the server).
+  Send `""` on update to fall back to the viewer's own calendar colors. It is shared with every
+  occurrence of a recurring series and is not part of a single-occurrence patch.
 - `visibility` follows task rules: `private` is creator-only, `team` is team-readable and
   `channel` is channel-readable. A channel is required for channel visibility.
 - Only the creator or a system administrator may update or delete an event.

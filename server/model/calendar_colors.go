@@ -26,6 +26,12 @@ func NormalizeCalendarColors(input CalendarColors) (CalendarColors, error) {
 	return CalendarColors{Mine: mine, Team: team}, nil
 }
 
+// NormalizeColor validates an optional #rrggbb value and returns its lowercase form. An empty
+// color is valid and means "use the default".
+func NormalizeColor(value string) (string, error) {
+	return normalizeHexColor(value)
+}
+
 // normalizeHexColor accepts an optional #rrggbb value, case-insensitively, and returns it in
 // lowercase. Anything else is invalid: the value ends up in a CSS property, so it must not carry
 // another syntax the client would have to sanitize.

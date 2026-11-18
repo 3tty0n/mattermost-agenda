@@ -192,11 +192,11 @@
     width: 100%;
     height: 3px;
     border-radius: var(--radius-pill);
-    background: var(--Tasks-CalendarTeam);
+    background: var(--Tasks-ItemColor, var(--Tasks-CalendarTeam));
 }
 
 .Tasks-Calendar__eventBar--mine {
-    background: var(--Tasks-CalendarMine);
+    background: var(--Tasks-ItemColor, var(--Tasks-CalendarMine));
 }
 
 /* A multi-day event draws one continuous band across its days: every segment bleeds to the cell

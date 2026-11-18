@@ -1,6 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
+import {CALENDAR_COLOR_PRESETS} from 'calendar_colors';
 import {DAY_IN_MS} from 'calendar_utils';
 import {createEvent, deleteEvent, getEvent, updateEvent} from 'client';
 import {formatDateInput, formatTimeInput, parseDateInput, parseTimeInput, wallDateTime} from 'datetime_input_utils';
@@ -21,6 +22,7 @@ import FormatItalicIcon from '@mattermost/compass-icons/components/format-italic
 import FormatListBulletedIcon from '@mattermost/compass-icons/components/format-list-bulleted';
 import LinkVariantIcon from '@mattermost/compass-icons/components/link-variant';
 import MapMarkerOutlineIcon from '@mattermost/compass-icons/components/map-marker-outline';
+import PaletteOutlineIcon from '@mattermost/compass-icons/components/palette-outline';
 import RefreshIcon from '@mattermost/compass-icons/components/refresh';
 import {Button} from '@mattermost/compass-ui/components/button';
 import {Checkbox} from '@mattermost/compass-ui/components/checkbox';
@@ -95,6 +97,7 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [location, setLocation] = useState('');
+    const [color, setColor] = useState('');
     const [allDay, setAllDay] = useState(Boolean(defaults?.allDay));
 
     // True once the user chose an all-day end other than the start day; until then the end follows the start.
@@ -127,7 +130,7 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
             setPreview(true);
         }
     });
-    const [openProperty, setOpenProperty] = useState<'timezone'|'scope'|'repeat'>();
+    const [openProperty, setOpenProperty] = useState<'timezone'|'scope'|'repeat'|'color'>();
     const [editScope, setEditScope] = useState<'occurrence'|'series'>(occurrenceStartAt ? 'occurrence' : 'series');
     const [repeatMode, setRepeatMode] = useState<'never'|'daily'|'weekdays'|'weekly'|'custom'>('never');
     const [repeatWeekdays, setRepeatWeekdays] = useState<number[]>([]);
@@ -150,6 +153,7 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
                 setDescription(loaded.description ?? '');
                 setPreview(Boolean(loaded.description?.trim()));
                 setLocation(loaded.location ?? '');
+                setColor(loaded.color ?? '');
                 setAllDay(Boolean(loaded.allDay));
 
                 // When editing one occurrence, the inputs show that occurrence's effective times,
@@ -677,6 +681,7 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
                         title: trimmed,
                         description,
                         location: location.trim(),
+                        color,
                         teamId: teamID,
                         channelId: visibility === 'channel' ? channelID : '',
                         visibility,
@@ -695,6 +700,7 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
                     title: trimmed,
                     description,
                     location: location.trim() || undefined,
+                    color: color || undefined,
                     teamId: teamID,
                     channelId: visibility === 'channel' ? channelID : undefined,
                     visibility,
@@ -1234,6 +1240,38 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
                         </button>
                         <button
                             type='button'
+                            className='Tasks-TaskEditor__propertySummary'
+                            aria-expanded={openProperty === 'color'}
+                            disabled={!fieldEditable}
+                            onClick={() => setOpenProperty(openProperty === 'color' ? undefined : 'color')}
+                        >
+                            <Icon
+                                size='16'
+                                glyph={<PaletteOutlineIcon/>}
+                            />
+                            <span className='Tasks-EventEditor__colorChoice'>
+                                <span className='Tasks-TaskEditor__srOnly'>
+                                    <FormattedMessage
+                                        id='tasks.event.color'
+                                        defaultMessage='Event color'
+                                    />
+                                </span>
+                                {color ? (
+                                    <span
+                                        className='Tasks-EventEditor__colorDot'
+                                        style={{backgroundColor: color}}
+                                        aria-hidden='true'
+                                    />
+                                ) : (
+                                    <FormattedMessage
+                                        id='tasks.event.color_default'
+                                        defaultMessage='Default color'
+                                    />
+                                )}
+                            </span>
+                        </button>
+                        <button
+                            type='button'
                             className='Tasks-TaskEditor__propertySummary Tasks-EventEditor__scopeSummary'
                             aria-expanded={openProperty === 'scope'}
                             disabled={!fieldEditable}
@@ -1374,6 +1412,68 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
                                         onChange={changeTimeZone}
                                         disabled={!fieldEditable}
                                     />
+                                </div>
+                            )}
+                            {openProperty === 'color' && (
+                                <div className='Tasks-TaskEditor__propertyBody'>
+                                    <span className='Tasks-TaskEditor__propertyLabel'>
+                                        <FormattedMessage
+                                            id='tasks.event.color'
+                                            defaultMessage='Event color'
+                                        />
+                                    </span>
+                                    <div
+                                        className='Tasks-EventEditor__colorSwatches'
+                                        role='group'
+                                        aria-label={intl.formatMessage({id: 'tasks.event.color', defaultMessage: 'Event color'})}
+                                    >
+                                        {CALENDAR_COLOR_PRESETS.map((preset) => (
+                                            <button
+                                                key={preset}
+                                                type='button'
+                                                className={`Tasks-EventEditor__colorSwatch${color === preset ? ' Tasks-EventEditor__colorSwatch--selected' : ''}`}
+                                                style={{backgroundColor: preset}}
+                                                aria-pressed={color === preset}
+                                                aria-label={intl.formatMessage(
+                                                    {id: 'tasks.calendar.colors.select', defaultMessage: 'Set the {which} color to {value}'},
+                                                    {which: intl.formatMessage({id: 'tasks.event.color', defaultMessage: 'Event color'}), value: preset},
+                                                )}
+                                                onClick={() => {
+                                                    setColor(preset);
+                                                    setOpenProperty(undefined);
+                                                }}
+                                            />
+                                        ))}
+                                        <label
+                                            className={`Tasks-EventEditor__colorCustom${color && !CALENDAR_COLOR_PRESETS.includes(color) ? ' Tasks-EventEditor__colorCustom--selected' : ''}`}
+                                        >
+                                            <input
+                                                type='color'
+                                                value={(/^#[0-9a-f]{6}$/i).test(color) ? color : CALENDAR_COLOR_PRESETS[0]}
+                                                aria-label={intl.formatMessage({id: 'tasks.event.color_custom', defaultMessage: 'Pick a custom event color'})}
+                                                onChange={(changeEvent) => setColor(changeEvent.target.value.toLowerCase())}
+                                            />
+                                        </label>
+                                        <button
+                                            type='button'
+                                            className='Tasks-EventEditor__colorDefault'
+                                            onClick={() => {
+                                                setColor('');
+                                                setOpenProperty(undefined);
+                                            }}
+                                        >
+                                            <FormattedMessage
+                                                id='tasks.event.color_default'
+                                                defaultMessage='Default color'
+                                            />
+                                        </button>
+                                    </div>
+                                    <p className='Tasks-TaskEditor__hint'>
+                                        <FormattedMessage
+                                            id='tasks.event.color_hint'
+                                            defaultMessage='Colors show on the calendar. Leave unset to use your calendar’s own colors.'
+                                        />
+                                    </p>
                                 </div>
                             )}
                             {openProperty === 'scope' && (

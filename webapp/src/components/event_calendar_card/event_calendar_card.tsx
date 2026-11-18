@@ -1,6 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
+import {itemColorVars} from 'calendar_colors';
 import {getProfilePictureUrl, type Profile} from 'client';
 import {formatEventTime} from 'event_utils';
 import {useHour12} from 'hooks';
@@ -27,6 +28,9 @@ type Props = {
 
     // True when the signed-in user created the event, which tints the card with their own color.
     mine?: boolean;
+
+    // The event's own color; unset falls back to the creator-based colors.
+    color?: string;
     onOpen: (eventID: string, occurrenceStartAt?: number) => void;
 };
 
@@ -36,7 +40,7 @@ const MAX_AVATARS = 9;
 // EventCalendarCard is intentionally different from TaskCalendarCard: an accent bar and a time
 // range, no checkbox or priority. Participants sit on their own row (or, when the card is wide, at
 // the right end of a single row) so they never take width from the time range.
-export default function EventCalendarCard({event, occurrenceStartAt, mine, profiles, onOpen}: Props) {
+export default function EventCalendarCard({event, occurrenceStartAt, mine, color, profiles, onOpen}: Props) {
     const intl = useIntl();
     const hour12 = useHour12();
     const visibleAssignees = event.assigneeIds.slice(0, MAX_AVATARS);
@@ -47,6 +51,7 @@ export default function EventCalendarCard({event, occurrenceStartAt, mine, profi
     return (
         <article
             className={`Tasks-EventCard${mine ? ' Tasks-EventCard--mine' : ''}`}
+            style={itemColorVars(color)}
             onClick={() => onOpen(event.id, occurrenceStartAt)}
         >
             <div className='Tasks-EventCard__body'>
