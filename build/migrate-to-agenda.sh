@@ -47,7 +47,19 @@ command -v curl >/dev/null || die "curl is required"
 # plugin API accepts it as a bearer token, so no cookies or CSRF header are needed.
 SITE_URL="${MM_SERVICESETTINGS_SITEURL:?MM_SERVICESETTINGS_SITEURL is not set}"
 HEADERS_FILE=$(mktemp)
-trap 'rm -f "$HEADERS_FILE"' EXIT
+STASH_DIR=$(mktemp -d)
+
+# One trap for every temporary: the headers file, the bundle stash, and the plugin.json backup
+# that only exists while the old-ID build has swapped it.
+cleanup() {
+    if [ -f plugin.json.bak ]; then
+        mv -f plugin.json.bak plugin.json
+        make apply >/dev/null 2>&1 || true
+    fi
+    rm -f "$HEADERS_FILE"
+    rm -rf "$STASH_DIR"
+}
+trap cleanup EXIT
 
 # A reverse proxy often redirects http to https; curl treats the 3xx as success and the login
 # would find no token header. Resolve the real URL with an unauthenticated ping first.
@@ -112,22 +124,29 @@ admin_login() {
     [ "$status" = "200" ] || die "the token was rejected by /api/v4/users/me (HTTP $status)"
 }
 
-build_old_bundle() {
+# `make dist` empties dist/ before each build (its bundle target runs rm -rf dist/), so
+# whichever bundle is built first would be wiped by the second build. Build one, stash a copy
+# outside dist/, build the other, then put both back.
+build_bundles() {
     log "Building the migration bundle under the old ID ($OLD_ID, v$VERSION)"
-    [ -f "$NEW_BUNDLE" ] || make dist
-    [ -f "$OLD_BUNDLE" ] || {
+    if [ ! -f "$OLD_BUNDLE" ]; then
         sed -i.bak "s/$NEW_ID/$OLD_ID/" plugin.json
-        trap 'mv -f plugin.json.bak plugin.json' EXIT
         make apply dist
-        mv -f plugin.json.bak plugin.json
-        trap - EXIT
-    }
+        mv -f plugin.json.bak plugin.json && make apply
+    fi
+    cp -f "$OLD_BUNDLE" "$STASH_DIR/"
+
+    log "Building the new plugin bundle ($NEW_ID, v$VERSION)"
+    if [ ! -f "$NEW_BUNDLE" ]; then
+        make dist
+    fi
+    cp -f "$STASH_DIR/$(basename "$OLD_BUNDLE")" dist/
 }
 
 echo "Agenda migration: $OLD_ID -> $NEW_ID (v$VERSION)"
 resolve_site_url
 admin_login
-build_old_bundle
+build_bundles
 
 log "Step 1/5: deploying the migration build under the old plugin ID"
 "$PLUGINCTL" deploy "$OLD_ID" "$OLD_BUNDLE"
