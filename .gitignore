@@ -19,3 +19,4 @@ server/manifest.go
 .gopath/
 
 .env
+agenda-export.json
