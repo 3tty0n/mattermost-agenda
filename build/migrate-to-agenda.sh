@@ -63,6 +63,9 @@ resolve_site_url() {
     if [ "$effective" != "$SITE_URL" ]; then
         log "Following the redirect: using $effective"
         SITE_URL="$effective"
+        # pluginctl and other child processes re-read the environment; hand them the resolved
+        # URL so their own logins do not hit the redirect.
+        export MM_SERVICESETTINGS_SITEURL="$SITE_URL"
     fi
 }
 
