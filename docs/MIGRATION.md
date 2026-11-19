@@ -5,47 +5,93 @@ The plugin was renamed from `com.github.3tty0n.mattermost-tasks` to
 plugin ID, so the new plugin cannot see the old one's data. This is a one-time migration:
 the old install **exports** every record to a JSON file, and the new install **imports** it.
 
-## Steps
+## One-command migration
 
-1. **Upgrade the old plugin to the migration build.** Install the last release that still uses the
-   old ID — v0.3.0 or later bundles contain the export endpoint. If the running install is older,
-   install the `mattermost-tasks`-ID bundle of v0.3.0 over it (same ID upgrades keep data) — build
-   it once with:
+`build/migrate-to-agenda.sh` performs every step below: it builds the old-ID migration bundle,
+deploys it, exports all records, deploys the new plugin, imports the records, and disables the
+old plugin.
+
+```bash
+export MM_SERVICESETTINGS_SITEURL=http://localhost:8065
+export MM_ADMIN_USERNAME=sysadmin
+export MM_ADMIN_PASSWORD=secret
+./build/migrate-to-agenda.sh
+```
+
+After it finishes: verify your tasks and events in Agenda, delete the old `Tasks` plugin in the
+System Console, deactivate the `tasks-bot` user, and remove the `agenda-export.json` it wrote.
+
+## What the script does (manual equivalent)
+
+1. **Upgrade the old plugin to the migration build.** The running install predates the export
+   endpoint, so deploy a bundle that still uses the old ID but contains it — build it once with:
 
    ```bash
-   cp plugin.json plugin.json.bak
-   sed -i 's/mattermost-agenda/mattermost-tasks/' plugin.json
+   sed -i.bak 's/mattermost-agenda/mattermost-tasks/' plugin.json
    make apply dist   # dist/com.github.3tty0n.mattermost-tasks-<version>.tar.gz
-   mv plugin.json.bak plugin.json && make apply
+   mv -f plugin.json.bak plugin.json && make apply
+   ./build/bin/pluginctl deploy com.github.3tty0n.mattermost-tasks dist/com.github.3tty0n.mattermost-tasks-<version>.tar.gz
    ```
 
-   Upload that bundle in **System Console → Plugins → Plugin Management** (uploading the same ID
-   with a newer version replaces the code, not the data), then **disable** the plugin.
+   Uploading the same ID with a newer version replaces the code, not the data.
 
-2. **Export.** Signed in as a system administrator, open
-   `<SiteURL>/plugins/com.github.3tty0n.mattermost-tasks/api/v1/admin/export`
-   in the browser. Save the downloaded `agenda-export.json`.
-
-3. **Install the new plugin.** Upload
-   `dist/com.github.3tty0n.mattermost-agenda-<version>.tar.gz` and enable it.
-
-4. **Import.** With the admin's session cookies and CSRF token (or the browser devtools, replaying a
-   `fetch` from the webapp):
+2. **Export.** The script logs in as the admin and downloads every record:
 
    ```bash
-   curl -X POST '<SiteURL>/plugins/com.github.3tty0n.mattermost-agenda/api/v1/admin/import' \
+   curl -b cookies.txt "$SITE_URL/plugins/com.github.3tty0n.mattermost-tasks/api/v1/admin/export" \
+     -o agenda-export.json
+   ```
+
+3. **Deploy the new plugin.**
+
+   ```bash
+   ./build/bin/pluginctl deploy com.github.3tty0n.mattermost-agenda dist/com.github.3tty0n.mattermost-agenda-<version>.tar.gz
+   ```
+
+4. **Import.**
+
+   ```bash
+   curl -X POST "$SITE_URL/plugins/com.github.3tty0n.mattermost-agenda/api/v1/admin/import" \
      -H 'X-Requested-With: XMLHttpRequest' \
-     -H 'X-CSRF-Token: <MMCSRF cookie value>' \
+     -H "X-CSRF-Token: $MMCSRF" \
      -H 'Content-Type: application/json' \
-     -b 'MMCSRF=<cookie>; MMAUTHTOKEN=<cookie>' \
+     -b cookies.txt \
      --data @agenda-export.json
    ```
 
    The response is `{"written": N, "skipped": M}`. Existing keys are skipped, so re-running the
    import never overwrites data created after the switch.
 
-5. **Clean up.** Disable and delete the old `Tasks` plugin in the System Console. Its bot user
-   `tasks-bot` can be deactivated; the new install creates `agenda-bot`.
+5. **Clean up.** Disable the old plugin (`./build/bin/pluginctl disable
+   com.github.3tty0n.mattermost-tasks`), then delete it and deactivate the `tasks-bot` user in the
+   System Console; the new install creates `agenda-bot`.
+
+## Where the CSRF token and cookies come from
+
+The plugin API authenticates with the admin's **session cookie** (`MMAUTHTOKEN`) and, for non-GET
+requests, the **CSRF token** (`MMCSRF`) in the `X-CSRF-Token` header. Both are `HttpOnly` browser
+cookies, so a script cannot read them from JavaScript — take them from either place:
+
+- **Login response cookies (what the script does).** `POST /api/v4/users/login` with
+  `{"login_id": "...", "password": "..."}` sets them; `curl -c cookies.txt` saves the pair:
+
+  ```bash
+  curl -c cookies.txt -H 'Content-Type: application/json' \
+    -d '{"login_id":"sysadmin","password":"secret"}' \
+    "$SITE_URL/api/v4/users/login" -o /dev/null
+  awk '$6=="MMAUTHTOKEN"{print $7}' cookies.txt   # session token
+  awk '$6=="MMCSRF"{print $7}' cookies.txt        # CSRF token
+  ```
+
+- **Browser devtools (manual fallback).** Open the Mattermost webapp as the admin, then
+  devtools → Application (Firefox: Storage) → Cookies → the site's origin: `MMCSRF` is the value
+  for the `X-CSRF-Token` header and `MMAUTHTOKEN` the cookie sent with `-b`. Or simpler: devtools
+  → Network → replay any webapp request as cURL ("Copy as cURL") and swap in the export/import URL
+  — the cookies and header travel with the copied command.
+
+A **personal access token** (`MM_ADMIN_TOKEN`, Account Settings → Security → Personal Access
+Tokens) authenticates `make deploy`'s Client4 calls, but the plugin's own API wants the session
+cookie pair above, so the migration script logs in with username and password instead.
 
 ## Notes
 
