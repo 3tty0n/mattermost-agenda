@@ -210,9 +210,10 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
         return {continuesLeft: startKey < key, continuesRight: endKey > key};
     };
 
-    // The calendar tints items the user created with their own color, everything else with the
-    // team color.
-    const isMine = (creatorId?: string) => Boolean(currentUserId && creatorId === currentUserId);
+    // The calendar tints items the user takes part in with their own color; everything else gets
+    // the team color. Taking part means being a participant (an event attendee or a task
+    // assignee) — creating something alone no longer claims it.
+    const isMine = (assigneeIds?: string[]) => Boolean(currentUserId && assigneeIds?.includes(currentUserId));
 
     const goTo = (nextCursor: Date, nextMode: CalendarMode = mode) => {
         setCursor(nextCursor);
@@ -285,7 +286,7 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                 <TaskCalendarCard
                     key={`${occurrence.task.id}:${occurrence.dueAt}`}
                     task={{...occurrence.task, dueAt: occurrence.dueAt}}
-                    mine={isMine(occurrence.task.creatorId)}
+                    mine={isMine(occurrence.task.assigneeIds)}
                     profiles={profiles}
                     onOpen={onOpenTask}
                 />
@@ -300,7 +301,7 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                     key={`${occurrence.event.id}:${occurrence.dateKey}`}
                     event={occurrence.event}
                     occurrenceStartAt={occurrence.originalStart}
-                    mine={isMine(occurrence.event.creatorId)}
+                    mine={isMine(occurrence.event.assigneeIds)}
                     color={occurrence.event.color}
                     profiles={profiles}
                     onOpen={onOpenEvent}
@@ -532,7 +533,7 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                                                         return (
                                                             <span
                                                                 key={`${occurrence.event.id}:${occurrence.dateKey}`}
-                                                                className={`Tasks-Calendar__eventBar${isMine(occurrence.event.creatorId) ? ' Tasks-Calendar__eventBar--mine' : ''}${continuesLeft || continuesRight ? ' Tasks-Calendar__eventBar--flow' : ''}${connectsLeft ? ' Tasks-Calendar__eventBar--connectLeft' : ''}${connectsRight ? ' Tasks-Calendar__eventBar--connectRight' : ''}`}
+                                                                className={`Tasks-Calendar__eventBar${isMine(occurrence.event.assigneeIds) ? ' Tasks-Calendar__eventBar--mine' : ''}${continuesLeft || continuesRight ? ' Tasks-Calendar__eventBar--flow' : ''}${connectsLeft ? ' Tasks-Calendar__eventBar--connectLeft' : ''}${connectsRight ? ' Tasks-Calendar__eventBar--connectRight' : ''}`}
                                                                 style={itemColorVars(occurrence.event.color)}
                                                             />
                                                         );
@@ -547,7 +548,7 @@ export default function Calendar({scope, teamId, priority, assigneeId, revision,
                                                     {dayTasks.slice(0, 3).map((occurrence) => (
                                                         <span
                                                             key={`${occurrence.task.id}:${occurrence.dueAt}`}
-                                                            className={`Tasks-Calendar__dot${isMine(occurrence.task.creatorId) ? ' Tasks-Calendar__dot--mine' : ''}`}
+                                                            className={`Tasks-Calendar__dot${isMine(occurrence.task.assigneeIds) ? ' Tasks-Calendar__dot--mine' : ''}`}
                                                         />
                                                     ))}
                                                 </span>

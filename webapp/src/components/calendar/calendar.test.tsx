@@ -296,7 +296,7 @@ describe('Calendar', () => {
                 teamId: ids.team,
                 visibility: 'team',
                 creatorId: ids.user,
-                assigneeIds: [],
+                assigneeIds: [ids.user],
                 title: 'Mine',
                 startAt: todayAt(10),
                 endAt: todayAt(11),
@@ -309,7 +309,7 @@ describe('Calendar', () => {
                 id: 'event-2',
                 teamId: ids.team,
                 visibility: 'team',
-                creatorId: ids.otherUser,
+                creatorId: ids.user,
                 assigneeIds: [],
                 title: 'Theirs',
                 startAt: todayAt(12),
@@ -328,22 +328,22 @@ describe('Calendar', () => {
         });
         fetchTasksMock.mockResolvedValue(page([
             task(),
-            task({id: 'task-2', title: 'Theirs', creatorId: ids.otherUser, dueAt: todayAt(9)}),
+            task({id: 'task-2', title: 'Mine too', creatorId: ids.otherUser, assigneeIds: [ids.user], dueAt: todayAt(9)}),
         ]));
         const {container} = renderCalendar();
 
         await screen.findByRole('button', {name: 'Pick up mail'});
 
-        // The event bar and task dot of the user's own items carry the mine variant; other
-        // people's stay on the team color.
-        const bar = container.querySelector('.Tasks-Calendar__eventBar');
-        expect(bar).toHaveClass('Tasks-Calendar__eventBar--mine');
+        // Items the user takes part in carry the mine variant; created-but-not-attended items
+        // and other people's stay on the team color.
+        const bars = container.querySelectorAll<HTMLElement>('.Tasks-Calendar__eventBar');
+        expect(bars[0]).toHaveClass('Tasks-Calendar__eventBar--mine');
+        expect(bars[1]).not.toHaveClass('Tasks-Calendar__eventBar--mine');
         const dots = container.querySelectorAll('.Tasks-Calendar__dot');
-        expect(dots[0]).not.toHaveClass('Tasks-Calendar__dot--mine');
-        expect(dots[1]).toHaveClass('Tasks-Calendar__dot--mine');
+        expect(dots[0]).toHaveClass('Tasks-Calendar__dot--mine');
+        expect(dots[1]).not.toHaveClass('Tasks-Calendar__dot--mine');
 
         // An event with its own color carries it to the calendar surfaces.
-        const bars = container.querySelectorAll<HTMLElement>('.Tasks-Calendar__eventBar');
         expect(bars[1].style.getPropertyValue('--Tasks-ItemColor')).toBe('#8968cd');
 
         // Picking a color stores it for the signed-in user.

@@ -285,10 +285,12 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
     if (channelID && !channelOptions.some((option) => option.value === channelID)) {
         channelOptions.push({value: channelID, label: channelID});
     }
+    // Events name the scopes after what the user is choosing: a personal "My event" or a shared
+    // "Team event". The values still map to the task visibilities the server enforces.
     const visibilityLabels: Record<TaskVisibility, string> = {
-        private: intl.formatMessage({id: 'tasks.editor.visibility_private', defaultMessage: 'Only me'}),
-        team: intl.formatMessage({id: 'tasks.editor.visibility_team', defaultMessage: 'Team'}),
-        channel: intl.formatMessage({id: 'tasks.editor.visibility_channel', defaultMessage: 'Channel'}),
+        private: intl.formatMessage({id: 'tasks.event.visibility_my', defaultMessage: 'My event'}),
+        team: intl.formatMessage({id: 'tasks.event.visibility_team_event', defaultMessage: 'Team event'}),
+        channel: intl.formatMessage({id: 'tasks.event.visibility_channel_event', defaultMessage: 'Channel event'}),
     };
 
     const changeTeam = (value: string) => {
@@ -370,16 +372,9 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
         requestAnimationFrame(() => descriptionRef.current?.focus());
     };
 
-    const selectedTeam = myTeams.find((team) => team.id === teamID);
-    const selectedChannel = myChannels.find((channel) => channel.id === channelID);
-    let scopeLabel = intl.formatMessage({id: 'tasks.editor.visibility_team', defaultMessage: 'Team'});
-    if (visibility === 'private') {
-        scopeLabel = intl.formatMessage({id: 'tasks.editor.visibility_private', defaultMessage: 'Only me'});
-    } else if (visibility === 'channel') {
-        scopeLabel = selectedChannel?.display_name ?? intl.formatMessage({id: 'tasks.editor.visibility_channel', defaultMessage: 'Channel'});
-    } else if (selectedTeam) {
-        scopeLabel = selectedTeam.display_name;
-    }
+    // The scope summary always names the event kind; which team or channel it belongs to shows in
+    // the panel's selects.
+    const scopeLabel = visibilityLabels[visibility];
     const displayZone = isValidTimeZone(timeZone) ? timeZone : 'UTC';
     const formatEventWhen = (value: number | undefined, withTime: boolean) => {
         if (!value) {
@@ -1214,6 +1209,19 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
                         />
                         <button
                             type='button'
+                            className='Tasks-TaskEditor__propertySummary Tasks-EventEditor__scopeSummary'
+                            aria-expanded={openProperty === 'scope'}
+                            disabled={!fieldEditable}
+                            onClick={() => setOpenProperty(openProperty === 'scope' ? undefined : 'scope')}
+                        >
+                            <Icon
+                                size='16'
+                                glyph={<FolderOutlineIcon/>}
+                            />
+                            <span className='Tasks-EventEditor__scopeLabel'>{scopeLabel}</span>
+                        </button>
+                        <button
+                            type='button'
                             className='Tasks-TaskEditor__propertySummary'
                             aria-expanded={openProperty === 'repeat'}
                             disabled={!fieldEditable}
@@ -1269,19 +1277,6 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
                                     />
                                 )}
                             </span>
-                        </button>
-                        <button
-                            type='button'
-                            className='Tasks-TaskEditor__propertySummary Tasks-EventEditor__scopeSummary'
-                            aria-expanded={openProperty === 'scope'}
-                            disabled={!fieldEditable}
-                            onClick={() => setOpenProperty(openProperty === 'scope' ? undefined : 'scope')}
-                        >
-                            <Icon
-                                size='16'
-                                glyph={<FolderOutlineIcon/>}
-                            />
-                            <span className='Tasks-EventEditor__scopeLabel'>{scopeLabel}</span>
                         </button>
                     </div>
 
@@ -1480,8 +1475,8 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
                                 <div className='Tasks-TaskEditor__propertyBody'>
                                     <span className='Tasks-TaskEditor__propertyLabel'>
                                         <FormattedMessage
-                                            id='tasks.editor.visibility'
-                                            defaultMessage='Who can see this task?'
+                                            id='tasks.event.visibility_question'
+                                            defaultMessage='Who can see this event?'
                                         />
                                     </span>
                                     <div
@@ -1521,6 +1516,12 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
                                             onChange={setChannelID}
                                         />
                                     )}
+                                    <p className='Tasks-TaskEditor__hint'>
+                                        <FormattedMessage
+                                            id='tasks.event.visibility_hint'
+                                            defaultMessage='My events stay in your Mine view. Team and channel events appear for everyone in the team or channel.'
+                                        />
+                                    </p>
                                 </div>
                             )}
                         </div>

@@ -122,9 +122,10 @@ func TestPrivateEventVisibilityAndRange(t *testing.T) {
 
 	query.Scope = taskmodel.TaskScopeTeam
 	query.TeamID = teamID
+	// The team view holds shared events only; a private event stays in the Mine view.
 	result, err = env.service.List(creatorID, query)
 	require.NoError(t, err)
-	assert.Equal(t, 1, result.Total)
+	assert.Zero(t, result.Total)
 	result, err = env.service.List(otherID, query)
 	require.NoError(t, err)
 	assert.Zero(t, result.Total)

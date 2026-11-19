@@ -532,6 +532,44 @@ describe('EventEditor', () => {
         await waitFor(() => expect(updateEventMock).toHaveBeenCalledWith('event-1', expect.objectContaining({color: ''})));
     });
 
+    it('switches a shared event to My event', async () => {
+        const user = userEvent.setup();
+        getEventMock.mockResolvedValue(savedEvent); // channel visibility
+        renderWithStore(
+            <EventEditor
+                eventId='event-1'
+                onClose={jest.fn()}
+                onSaved={jest.fn()}
+            />,
+        );
+
+        await screen.findByDisplayValue('Sprint planning');
+        await user.click(screen.getByRole('button', {name: 'Channel event'}));
+        const choices = screen.getByRole('group', {name: 'Visible to'});
+        await user.click(within(choices).getByRole('button', {name: 'My event'}));
+        await user.click(screen.getByRole('button', {name: 'Save'}));
+        await waitFor(() => expect(updateEventMock).toHaveBeenCalledWith('event-1', expect.objectContaining({visibility: 'private', channelId: ''})));
+    });
+
+    it('shares a My event with the team', async () => {
+        const user = userEvent.setup();
+        getEventMock.mockResolvedValue({...savedEvent, visibility: 'private'});
+        renderWithStore(
+            <EventEditor
+                eventId='event-1'
+                onClose={jest.fn()}
+                onSaved={jest.fn()}
+            />,
+        );
+
+        await screen.findByDisplayValue('Sprint planning');
+        await user.click(screen.getByRole('button', {name: 'My event'}));
+        const choices = screen.getByRole('group', {name: 'Visible to'});
+        await user.click(within(choices).getByRole('button', {name: 'Team event'}));
+        await user.click(screen.getByRole('button', {name: 'Save'}));
+        await waitFor(() => expect(updateEventMock).toHaveBeenCalledWith('event-1', expect.objectContaining({visibility: 'team', channelId: ''})));
+    });
+
     describe('with an occurrence of a recurring series', () => {
         const recurringSaved: Event = {
             ...savedEvent,

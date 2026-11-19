@@ -241,21 +241,13 @@ func (s *EventService) List(actorID string, query model.EventQuery) (*EventListR
 		if err != nil {
 			return nil, err
 		}
+		// The team view holds shared events only; private ones stay in the Mine view.
 		refs = filterEventRefs(loaded, func(ref model.EventRef) bool {
 			if ref.TeamID != query.TeamID || ref.EffectiveVisibility() == model.TaskVisibilityPrivate {
 				return false
 			}
 			return cache.CanView(actorID, ref.TeamID, ref.ChannelID)
 		})
-		privateRefs, privateErr := s.store.ListEventRefsByUser(actorID)
-		if privateErr != nil {
-			return nil, privateErr
-		}
-		refs = append(refs, filterEventRefs(privateRefs, func(ref model.EventRef) bool {
-			return ref.TeamID == query.TeamID &&
-				ref.EffectiveVisibility() == model.TaskVisibilityPrivate &&
-				ref.CreatorID == actorID
-		})...)
 	}
 
 	filtered := refs[:0]

@@ -24,8 +24,8 @@ accounts, no external service, no second database.
 - **Reminders:** a direct message from the plugin bot before a task's due time or an event's start;
   pick any of *at the time, 5 / 10 / 15 minutes, 1 day, 1 week* before.
 - **Visibility:** *Only me*, *Team* or *Channel*; the server re-checks it on every request.
-- **Calendar colors:** your own items get one color and everyone else's another; pick a preset or
-  any color, and the choice follows you across devices.
+- **Calendar colors:** items you take part in get one color and everything else another; pick a
+  preset or any color, and the choice follows you across devices.
 - **Quick capture:** **Create task** on any post, quick add in each board column, assignee
   autocomplete, assignment notifications, and `/task` / `/event` slash commands.
 
@@ -57,9 +57,9 @@ Release bundles are linux-amd64; maintainers can publish a macOS-inclusive one w
 
 Click the check-circle icon in the channel header to open the sidebar.
 
-- **Team / Mine:** *Team* (default in channels) shows the team's tasks and events you can read plus
-  your *Only me* items. *Mine* (default in DMs) shows tasks assigned to you and events you created
-  or are in.
+- **Team / Mine:** *Team* (default in channels) shows the team's shared tasks and events you can
+  read, plus your *Only me* tasks. *Mine* (default in DMs) shows tasks assigned to you and events
+  you created or take part in; private (*My*) events live here only.
 - **Views:** List, Board and Calendar. Board and calendar load up to 100 items; narrow the filters
   for more.
 
@@ -86,6 +86,9 @@ Click the check-circle icon in the channel header to open the sidebar.
   also opens **New event**.
 - A new event starts **now** and lasts the default duration; picking a start moves the end to
   start + that duration. Start and end come from a calendar and clock picker.
+- Every event is a **My event** (only you; it appears in *Mine* alone) or a **Team / Channel
+  event** everyone in the scope can see. Switch with the editor's scope picker, right after the
+  start and end.
 - Event cards show the time range, title, location (links open in a new tab) and up to nine
   overlapped participant avatars (more become “…”; hover for all names). On narrow sidebars the
   participants move to their own row so the time range is never cut off.

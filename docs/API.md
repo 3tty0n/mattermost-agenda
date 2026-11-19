@@ -205,7 +205,7 @@ DELETE /events/{id}
 whose interval overlaps them. With `include_recurring=true`, recurring series are also returned
 when their base start is outside the range, so the webapp can expand occurrences. `scope=my`
 lists events created by or assigned to the actor; `scope=team` requires
-`team_id` and lists readable team/channel events plus the actor's own private events.
+`team_id` and lists readable team/channel events — private events appear only in `scope=my`.
 
 Create body:
 
