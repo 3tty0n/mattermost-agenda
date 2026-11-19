@@ -45,17 +45,47 @@ SITE_URL="${MM_SERVICESETTINGS_SITEURL:?MM_SERVICESETTINGS_SITEURL is not set}"
 HEADERS_FILE=$(mktemp)
 trap 'rm -f "$HEADERS_FILE"' EXIT
 
+# A reverse proxy often redirects http to https; curl treats the 3xx as success and the login
+# would find no token header. Resolve the real URL with an unauthenticated ping first.
+resolve_site_url() {
+    log "Checking $SITE_URL"
+    local probe status effective
+    probe="$(curl -sS -L -o /dev/null -w '%{http_code} %{url_effective}' "$SITE_URL/api/v4/system/ping")" ||
+        die "cannot reach $SITE_URL ($SITE_URL/api/v4/system/ping)"
+    status="${probe%% *}"
+    effective="${probe#* }"
+    [ "$status" = "200" ] || die "Mattermost at $SITE_URL answered HTTP $status to /api/v4/system/ping"
+    effective="${effective%/api/v4/system/ping}"
+    if [ "$effective" != "$SITE_URL" ]; then
+        log "Following the redirect: using $effective"
+        SITE_URL="$effective"
+    fi
+}
+
 admin_login() {
     : "${MM_ADMIN_USERNAME:?MM_ADMIN_USERNAME is not set}"
     : "${MM_ADMIN_PASSWORD:?MM_ADMIN_PASSWORD is not set}"
 
     log "Logging in as $MM_ADMIN_USERNAME against $SITE_URL"
-    curl -Ssf -D "$HEADERS_FILE" -o /dev/null -H 'Content-Type: application/json' \
+    local status
+    status="$(curl -sS -L --post301 --post302 --post303 -D "$HEADERS_FILE" -o /dev/null \
+        -w '%{http_code}' -H 'Content-Type: application/json' \
         -d "{\"login_id\":\"$MM_ADMIN_USERNAME\",\"password\":\"$MM_ADMIN_PASSWORD\"}" \
-        "$SITE_URL/api/v4/users/login"
+        "$SITE_URL/api/v4/users/login")" ||
+        die "the login request failed against $SITE_URL"
+    [ "$status" = "200" ] || die "login answered HTTP $status — check the admin credentials"
 
     TOKEN="$(awk 'tolower($1) == "token:" {gsub(/\r/, ""); print $2}' "$HEADERS_FILE")"
-    [ -n "$TOKEN" ] || die "login returned no session token; check that $SITE_URL reaches Mattermost directly (a redirect or a reverse proxy may swallow the headers)"
+    if [ -z "$TOKEN" ]; then
+        sed 's/^/    /' "$HEADERS_FILE"
+        die "login returned no session token; check that $SITE_URL reaches Mattermost directly"
+    fi
+
+    # Verify the session before touching any plugin data.
+    status="$(curl -sS -o /dev/null -w '%{http_code}' \
+        -H "Authorization: Bearer $TOKEN" "$SITE_URL/api/v4/users/me")" ||
+        die "the session check request failed"
+    [ "$status" = "200" ] || die "the session token was rejected by /api/v4/users/me (HTTP $status)"
 }
 
 build_old_bundle() {
@@ -71,6 +101,7 @@ build_old_bundle() {
 }
 
 echo "Agenda migration: $OLD_ID -> $NEW_ID (v$VERSION)"
+resolve_site_url
 admin_login
 build_old_bundle
 

@@ -87,8 +87,11 @@ curl -H "Authorization: Bearer $TOKEN" \
 ```
 
 If the login returns no `Token` header, the URL is usually being redirected (http→https, or a
-trailing-slash redirect) or a reverse proxy is swallowing response headers — point
-`MM_SERVICESETTINGS_SITEURL` at the URL the browser actually uses.
+trailing-slash redirect) or a reverse proxy is swallowing response headers. The migration script
+handles this itself: it resolves redirects with `GET /api/v4/system/ping` first (so `http://`
+becomes the real `https://` URL), repeats the login POST across them with `--post301/302/303`,
+and verifies the session with `GET /api/v4/users/me` before migrating anything. Setting
+`MM_SERVICESETTINGS_SITEURL` to the URL the browser actually uses avoids the issue entirely.
 
 ### Browser fallback (cookies)
 
