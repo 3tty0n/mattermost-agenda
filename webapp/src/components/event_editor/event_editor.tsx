@@ -285,6 +285,7 @@ export default function EventEditor({eventId, occurrenceStartAt, defaults, onClo
     if (channelID && !channelOptions.some((option) => option.value === channelID)) {
         channelOptions.push({value: channelID, label: channelID});
     }
+
     // Events name the scopes after what the user is choosing: a personal "My event" or a shared
     // "Team event". The values still map to the task visibilities the server enforces.
     const visibilityLabels: Record<TaskVisibility, string> = {
