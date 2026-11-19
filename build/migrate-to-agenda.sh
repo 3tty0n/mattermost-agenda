@@ -8,10 +8,13 @@
 #
 # Prerequisites (same as `make deploy`):
 #   - MM_SERVICESETTINGS_SITEURL          e.g. http://localhost:8065
-#   - MM_ADMIN_USERNAME + MM_ADMIN_PASSWORD   (a system administrator; a personal access token
-#     authenticates `make deploy` but the plugin API needs the session cookie pair — see
-#     docs/MIGRATION.md, "Where the CSRF token and cookies come from")
+#   - MM_ADMIN_USERNAME + MM_ADMIN_PASSWORD   (a system administrator)
 #   - jq and curl installed
+#
+# Authentication: the login response carries the session token in its Token header (the same
+# value the webapp keeps in the MMAUTHTOKEN cookie). With "Authorization: Bearer <token>" the
+# plugin API authenticates without cookies, and CSRF does not apply — that is how this repo's
+# integration tests call plugin endpoints too.
 #
 # Notes:
 #   - The export contains every user's task and event content. Treat the output file as
@@ -36,28 +39,23 @@ die() { printf '\033[1;31mError: %s\033[0m\n' "$*" >&2; exit 1; }
 command -v jq >/dev/null || die "jq is required"
 command -v curl >/dev/null || die "curl is required"
 
-# The admin session: logging in sets the cookies the plugin API needs (MMAUTHTOKEN for auth,
-# MMCSRF for the X-CSRF-Token header). See docs/MIGRATION.md.
+# The admin session: logging in returns the session token in the Token response header. The
+# plugin API accepts it as a bearer token, so no cookies or CSRF header are needed.
 SITE_URL="${MM_SERVICESETTINGS_SITEURL:?MM_SERVICESETTINGS_SITEURL is not set}"
-LOGIN_FILE=$(mktemp)
-trap 'rm -f "$LOGIN_FILE"' EXIT
+HEADERS_FILE=$(mktemp)
+trap 'rm -f "$HEADERS_FILE"' EXIT
 
 admin_login() {
     : "${MM_ADMIN_USERNAME:?MM_ADMIN_USERNAME is not set}"
     : "${MM_ADMIN_PASSWORD:?MM_ADMIN_PASSWORD is not set}"
 
     log "Logging in as $MM_ADMIN_USERNAME against $SITE_URL"
-    curl -Ssf -c "$LOGIN_FILE" -H 'Content-Type: application/json' \
+    curl -Ssf -D "$HEADERS_FILE" -o /dev/null -H 'Content-Type: application/json' \
         -d "{\"login_id\":\"$MM_ADMIN_USERNAME\",\"password\":\"$MM_ADMIN_PASSWORD\"}" \
-        "$SITE_URL/api/v4/users/login" -o /dev/null
+        "$SITE_URL/api/v4/users/login"
 
-    # The login sets both cookies the plugin API needs; see docs/MIGRATION.md,
-    # "Where the CSRF token and cookies come from".
-    if ! grep -q 'MMCSRF' "$LOGIN_FILE" || ! grep -q 'MMAUTHTOKEN' "$LOGIN_FILE"; then
-        die "login succeeded but the session cookies are missing"
-    fi
-    CSRF="$(awk '$6 == "MMCSRF" {print $7}' "$LOGIN_FILE")"
-    [ -n "$CSRF" ] || die "login succeeded but no MMCSRF cookie was set"
+    TOKEN="$(awk 'tolower($1) == "token:" {gsub(/\r/, ""); print $2}' "$HEADERS_FILE")"
+    [ -n "$TOKEN" ] || die "login returned no session token; check that $SITE_URL reaches Mattermost directly (a redirect or a reverse proxy may swallow the headers)"
 }
 
 build_old_bundle() {
@@ -80,7 +78,7 @@ log "Step 1/5: deploying the migration build under the old plugin ID"
 "$PLUGINCTL" deploy "$OLD_ID" "$OLD_BUNDLE"
 
 log "Step 2/5: exporting every record from the old namespace"
-curl -Ssf -b "$LOGIN_FILE" \
+curl -Ssf -H "Authorization: Bearer $TOKEN" \
     -H 'X-Requested-With: XMLHttpRequest' \
     "$SITE_URL/plugins/$OLD_ID/api/v1/admin/export" -o "$EXPORT_FILE"
 jq -e '.version == 1' "$EXPORT_FILE" >/dev/null || die "unexpected export format in $EXPORT_FILE"
@@ -90,9 +88,8 @@ log "Step 3/5: deploying the new plugin ($NEW_ID)"
 "$PLUGINCTL" deploy "$NEW_ID" "$NEW_BUNDLE"
 
 log "Step 4/5: importing the records into the new namespace"
-curl -Ssf -X POST -b "$LOGIN_FILE" \
+curl -Ssf -X POST -H "Authorization: Bearer $TOKEN" \
     -H 'X-Requested-With: XMLHttpRequest' \
-    -H "X-CSRF-Token: $CSRF" \
     -H 'Content-Type: application/json' \
     --data @"$EXPORT_FILE" \
     "$SITE_URL/plugins/$NEW_ID/api/v1/admin/import"

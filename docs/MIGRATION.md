@@ -35,10 +35,12 @@ System Console, deactivate the `tasks-bot` user, and remove the `agenda-export.j
 
    Uploading the same ID with a newer version replaces the code, not the data.
 
-2. **Export.** The script logs in as the admin and downloads every record:
+2. **Export.** The script logs in as the admin and downloads every record with the session's
+   bearer token (see "How the script authenticates" below):
 
    ```bash
-   curl -b cookies.txt "$SITE_URL/plugins/com.github.3tty0n.mattermost-tasks/api/v1/admin/export" \
+   curl -H "Authorization: Bearer $TOKEN" \
+     "$SITE_URL/plugins/com.github.3tty0n.mattermost-tasks/api/v1/admin/export" \
      -o agenda-export.json
    ```
 
@@ -52,10 +54,8 @@ System Console, deactivate the `tasks-bot` user, and remove the `agenda-export.j
 
    ```bash
    curl -X POST "$SITE_URL/plugins/com.github.3tty0n.mattermost-agenda/api/v1/admin/import" \
-     -H 'X-Requested-With: XMLHttpRequest' \
-     -H "X-CSRF-Token: $MMCSRF" \
+     -H "Authorization: Bearer $TOKEN" \
      -H 'Content-Type: application/json' \
-     -b cookies.txt \
      --data @agenda-export.json
    ```
 
@@ -66,32 +66,42 @@ System Console, deactivate the `tasks-bot` user, and remove the `agenda-export.j
    com.github.3tty0n.mattermost-tasks`), then delete it and deactivate the `tasks-bot` user in the
    System Console; the new install creates `agenda-bot`.
 
-## Where the CSRF token and cookies come from
+## How the script authenticates
 
-The plugin API authenticates with the admin's **session cookie** (`MMAUTHTOKEN`) and, for non-GET
-requests, the **CSRF token** (`MMCSRF`) in the `X-CSRF-Token` header. Both are `HttpOnly` browser
-cookies, so a script cannot read them from JavaScript — take them from either place:
+`POST /api/v4/users/login` returns the **session token in its `Token` response header** — the same
+value the webapp keeps in the `MMAUTHTOKEN` cookie. Sending it as `Authorization: Bearer <token>`
+authenticates both `/api/v4` and plugin routes, and **no CSRF header is needed**: CSRF guards
+cookie-authenticated requests only. That is what the migration script uses, and what this repo's
+integration tests do to call plugin endpoints.
 
-- **Login response cookies (what the script does).** `POST /api/v4/users/login` with
-  `{"login_id": "...", "password": "..."}` sets them; `curl -c cookies.txt` saves the pair:
+```bash
+# Login and take the session token from the response headers.
+curl -sS -D headers.txt -H 'Content-Type: application/json' \
+  -d '{"login_id":"sysadmin","password":"secret"}' \
+  "$SITE_URL/api/v4/users/login" -o /dev/null
+TOKEN="$(awk 'tolower($1)=="token:" {gsub(/\r/,""); print $2}' headers.txt)"
 
-  ```bash
-  curl -c cookies.txt -H 'Content-Type: application/json' \
-    -d '{"login_id":"sysadmin","password":"secret"}' \
-    "$SITE_URL/api/v4/users/login" -o /dev/null
-  awk '$6=="MMAUTHTOKEN"{print $7}' cookies.txt   # session token
-  awk '$6=="MMCSRF"{print $7}' cookies.txt        # CSRF token
-  ```
+# Then the plugin API needs no cookies at all.
+curl -H "Authorization: Bearer $TOKEN" \
+  "$SITE_URL/plugins/com.github.3tty0n.mattermost-tasks/api/v1/admin/export" -o agenda-export.json
+```
 
-- **Browser devtools (manual fallback).** Open the Mattermost webapp as the admin, then
-  devtools → Application (Firefox: Storage) → Cookies → the site's origin: `MMCSRF` is the value
-  for the `X-CSRF-Token` header and `MMAUTHTOKEN` the cookie sent with `-b`. Or simpler: devtools
-  → Network → replay any webapp request as cURL ("Copy as cURL") and swap in the export/import URL
-  — the cookies and header travel with the copied command.
+If the login returns no `Token` header, the URL is usually being redirected (http→https, or a
+trailing-slash redirect) or a reverse proxy is swallowing response headers — point
+`MM_SERVICESETTINGS_SITEURL` at the URL the browser actually uses.
+
+### Browser fallback (cookies)
+
+Prefer trying from a browser session instead? The webapp authenticates with the `MMAUTHTOKEN`
+cookie plus the `MMCSRF` cookie in an `X-CSRF-Token` header on POSTs. Both are `HttpOnly`; copy
+them from devtools → Application (Firefox: Storage) → Cookies → the site's origin, or simpler:
+devtools → Network → any request → "Copy as cURL" and swap in the export/import URL — the cookies
+and header travel with the copied command.
 
 A **personal access token** (`MM_ADMIN_TOKEN`, Account Settings → Security → Personal Access
-Tokens) authenticates `make deploy`'s Client4 calls, but the plugin's own API wants the session
-cookie pair above, so the migration script logs in with username and password instead.
+Tokens) authenticates `make deploy`'s Client4 calls and works as a bearer token for `/api/v4`,
+but a *session* token (login) is what the script uses so the import's audit trail names a real
+session.
 
 ## Notes
 
