@@ -8,7 +8,11 @@
 #
 # Prerequisites (same as `make deploy`):
 #   - MM_SERVICESETTINGS_SITEURL          e.g. http://localhost:8065
-#   - MM_ADMIN_USERNAME + MM_ADMIN_PASSWORD   (a system administrator)
+#   - one of:
+#       MM_ADMIN_TOKEN                     a personal access token (Account Settings ->
+#                                          Security; works with MFA and SSO-only servers), or
+#       MM_ADMIN_USERNAME + MM_ADMIN_PASSWORD   an admin login (add MM_ADMIN_EMAIL if the
+#                                          server disables username sign-in)
 #   - jq and curl installed
 #
 # Authentication: the login response carries the session token in its Token header (the same
@@ -63,29 +67,46 @@ resolve_site_url() {
 }
 
 admin_login() {
-    : "${MM_ADMIN_USERNAME:?MM_ADMIN_USERNAME is not set}"
-    : "${MM_ADMIN_PASSWORD:?MM_ADMIN_PASSWORD is not set}"
-
-    log "Logging in as $MM_ADMIN_USERNAME against $SITE_URL"
     local status
-    status="$(curl -sS -L --post301 --post302 --post303 -D "$HEADERS_FILE" -o /dev/null \
-        -w '%{http_code}' -H 'Content-Type: application/json' \
-        -d "{\"login_id\":\"$MM_ADMIN_USERNAME\",\"password\":\"$MM_ADMIN_PASSWORD\"}" \
-        "$SITE_URL/api/v4/users/login")" ||
-        die "the login request failed against $SITE_URL"
-    [ "$status" = "200" ] || die "login answered HTTP $status — check the admin credentials"
 
-    TOKEN="$(awk 'tolower($1) == "token:" {gsub(/\r/, ""); print $2}' "$HEADERS_FILE")"
-    if [ -z "$TOKEN" ]; then
-        sed 's/^/    /' "$HEADERS_FILE"
-        die "login returned no session token; check that $SITE_URL reaches Mattermost directly"
+    # A personal access token is the most reliable way in: it is a session, so the plugin API
+    # takes it as a bearer token, and it works even when the server requires MFA or SSO sign-in.
+    # Create one in Account Settings -> Security -> Personal Access Tokens.
+    if [ -n "${MM_ADMIN_TOKEN:-}" ]; then
+        TOKEN="$MM_ADMIN_TOKEN"
+        log "Using MM_ADMIN_TOKEN (personal access token)"
+    else
+        # login_id accepts the email as well; some servers disable username sign-in entirely.
+        local login_id="${MM_ADMIN_EMAIL:-${MM_ADMIN_USERNAME:?MM_ADMIN_USERNAME (or MM_ADMIN_EMAIL) is not set}}"
+        : "${MM_ADMIN_PASSWORD:?MM_ADMIN_PASSWORD is not set}"
+
+        log "Logging in as $login_id against $SITE_URL"
+        status="$(curl -sS -L --post301 --post302 --post303 -D "$HEADERS_FILE" -o /dev/null \
+            -w '%{http_code}' -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg id "$login_id" --arg pw "$MM_ADMIN_PASSWORD" '{login_id: $id, password: $pw}')" \
+            "$SITE_URL/api/v4/users/login")" ||
+            die "the login request failed against $SITE_URL"
+        if [ "$status" = "401" ]; then
+            die "Mattermost rejected the credentials (HTTP 401):
+  - check the password (watch for \$ or quotes mangled by the shell in .env)
+  - if username sign-in is disabled on this server, set MM_ADMIN_EMAIL instead
+  - if the account uses MFA or SSO sign-in, create a personal access token
+    (Account Settings -> Security) and export MM_ADMIN_TOKEN"
+        fi
+        [ "$status" = "200" ] || die "login answered HTTP $status"
+
+        TOKEN="$(awk 'tolower($1) == "token:" {gsub(/\r/, ""); print $2}' "$HEADERS_FILE")"
+        if [ -z "$TOKEN" ]; then
+            sed 's/^/    /' "$HEADERS_FILE"
+            die "login returned no session token; check that $SITE_URL reaches Mattermost directly"
+        fi
     fi
 
     # Verify the session before touching any plugin data.
     status="$(curl -sS -o /dev/null -w '%{http_code}' \
         -H "Authorization: Bearer $TOKEN" "$SITE_URL/api/v4/users/me")" ||
         die "the session check request failed"
-    [ "$status" = "200" ] || die "the session token was rejected by /api/v4/users/me (HTTP $status)"
+    [ "$status" = "200" ] || die "the token was rejected by /api/v4/users/me (HTTP $status)"
 }
 
 build_old_bundle() {

@@ -18,6 +18,18 @@ export MM_ADMIN_PASSWORD=secret
 ./build/migrate-to-agenda.sh
 ```
 
+Or skip the password entirely with a **personal access token** (works even when the server
+requires MFA or SSO sign-in):
+
+```bash
+export MM_SERVICESETTINGS_SITEURL=http://localhost:8065
+export MM_ADMIN_TOKEN=<token from Account Settings -> Security -> Personal Access Tokens>
+./build/migrate-to-agenda.sh
+```
+
+If username sign-in is disabled on the server, pass the admin's email instead:
+`export MM_ADMIN_EMAIL=sysadmin@example.com` (with `MM_ADMIN_PASSWORD`).
+
 After it finishes: verify your tasks and events in Agenda, delete the old `Tasks` plugin in the
 System Console, deactivate the `tasks-bot` user, and remove the `agenda-export.json` it wrote.
 
@@ -102,9 +114,11 @@ devtools → Network → any request → "Copy as cURL" and swap in the export/i
 and header travel with the copied command.
 
 A **personal access token** (`MM_ADMIN_TOKEN`, Account Settings → Security → Personal Access
-Tokens) authenticates `make deploy`'s Client4 calls and works as a bearer token for `/api/v4`,
-but a *session* token (login) is what the script uses so the import's audit trail names a real
-session.
+Tokens) is the most reliable input: it is itself a session, so it works as the bearer token for
+the migration (and for `make deploy`'s Client4 calls) even when the account uses MFA or the server
+only allows SSO sign-in. A rejected password login (HTTP 401) usually means a typo, a password
+mangled by the shell (watch `$` and quotes in `.env`), username sign-in disabled (set
+`MM_ADMIN_EMAIL`), or MFA/SSO — in the last case, use the token.
 
 ## Notes
 
