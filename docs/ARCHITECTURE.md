@@ -1,7 +1,7 @@
 # Architecture
 
 This document records the architecture decisions for the Agenda plugin (plugin ID
-`com.github.3tty0n.mattermost-tasks`). It is deliberately biased
+`com.github.3tty0n.mattermost-agenda`). It is deliberately biased
 toward a small Mattermost deployment (one app node, 1 vCPU, 512 MB RAM) and a third-party plugin
 that cannot rely on internal server packages.
 
@@ -125,7 +125,7 @@ permission checks as HTTP; it is not a second implementation.
 
 ## Notifications
 
-A plugin bot (`tasks-bot`) sends direct messages to newly assigned users. The worker is bounded,
+A plugin bot (`agenda-bot`) sends direct messages to newly assigned users. The worker is bounded,
 closes during deactivation and does not block task creation on delivery. A missing bot disables
 notifications but leaves tasks working.
 

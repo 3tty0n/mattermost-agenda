@@ -3,7 +3,7 @@
 All routes are below:
 
 ```
-<SiteURL>/plugins/com.github.3tty0n.mattermost-tasks/api/v1
+<SiteURL>/plugins/com.github.3tty0n.mattermost-agenda/api/v1
 ```
 
 Authentication is the normal Mattermost session cookie. The server adds `Mattermost-User-ID`
@@ -280,8 +280,16 @@ nickname; if that search returns no hits, the handler falls back to the first pa
 members and matches every token against those fields. Avatars are loaded separately through the
 Mattermost users API.
 
+## Migration
+
+`GET /admin/export` (system administrators only) returns every KV record of this plugin's
+namespace as `{"version":1,"keys":[{"key":"task:...","value":"<base64>"}]}`. `POST /admin/import`
+with that body writes each record; a key that already exists is skipped, and the response is
+`{"written":N,"skipped":M}`. These exist for the plugin-ID rename — see
+[docs/MIGRATION.md](MIGRATION.md).
+
 ## WebSocket
 
-The server publishes `custom_com.github.3tty0n.mattermost-tasks_changed` to the task's channel (or
+The server publishes `custom_com.github.3tty0n.mattermost-agenda_changed` to the task's channel (or
 team for a team-level task) after create/update/delete. The payload contains the entity name,
 action, task ID, team ID and channel ID; it never contains the title or description.

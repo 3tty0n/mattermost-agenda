@@ -135,7 +135,7 @@ func TestTaskIntegration(t *testing.T) {
 func TestAssignmentNotificationIntegration(t *testing.T) {
 	th := testhelper.Setup(t)
 
-	bot, _, err := th.AdminClient.GetUserByUsername(t.Context(), "tasks-bot", "")
+	bot, _, err := th.AdminClient.GetUserByUsername(t.Context(), "agenda-bot", "")
 	require.NoError(t, err, "the plugin bot should exist after activation")
 
 	task := createTaskIntegration(t, th, th.AdminClient, map[string]any{

@@ -1,9 +1,9 @@
 {
-    "id": "com.github.3tty0n.mattermost-tasks",
+    "id": "com.github.3tty0n.mattermost-agenda",
     "name": "Agenda",
     "description": "Tasks and calendar events linked to Mattermost teams, channels, users and posts.",
-    "homepage_url": "https://github.com/3tty0n/mattermost-tasks",
-    "support_url": "https://github.com/3tty0n/mattermost-tasks/issues",
+    "homepage_url": "https://github.com/3tty0n/mattermost-agenda",
+    "support_url": "https://github.com/3tty0n/mattermost-agenda/issues",
     "icon_path": "assets/tasks-icon.svg",
     "min_server_version": "11.7.0",
     "server": {

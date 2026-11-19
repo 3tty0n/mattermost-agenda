@@ -14,24 +14,26 @@ import (
 	"github.com/3tty0n/mattermost-tasks/server/api"
 	"github.com/3tty0n/mattermost-tasks/server/command"
 	"github.com/3tty0n/mattermost-tasks/server/events"
+	"github.com/3tty0n/mattermost-tasks/server/migration"
 	"github.com/3tty0n/mattermost-tasks/server/notifications"
 	"github.com/3tty0n/mattermost-tasks/server/reminders"
 	"github.com/3tty0n/mattermost-tasks/server/store/kvstore"
-	"github.com/3tty0n/mattermost-tasks/server/userprefs"
 	"github.com/3tty0n/mattermost-tasks/server/tasks"
+	"github.com/3tty0n/mattermost-tasks/server/userprefs"
 )
 
 // Plugin implements the interface expected by the Mattermost server.
 type Plugin struct {
 	plugin.MattermostPlugin
 
-	client   *pluginapi.Client
-	access   *access.Checker
-	store    *kvstore.KVStore
-	tasks    *tasks.Service
-	events   *events.EventService
-	prefs    *userprefs.Service
-	notifier *notifications.Notifier
+	client    *pluginapi.Client
+	access    *access.Checker
+	store     *kvstore.KVStore
+	tasks     *tasks.Service
+	events    *events.EventService
+	prefs     *userprefs.Service
+	migration *migration.Service
+	notifier  *notifications.Notifier
 
 	// reminderJob fires due reminders once a minute on a single cluster node.
 	reminderJob *cluster.Job
@@ -69,6 +71,7 @@ func (p *Plugin) OnActivate() error {
 	p.tasks = tasks.NewService(p.client, p.store, p.access, publisher, p.notifier, tasks.WithReminders(scheduler))
 	p.events = events.NewEventService(p.client, p.store, p.access, publisher, events.WithEventReminders(scheduler))
 	p.prefs = userprefs.NewService(p.store)
+	p.migration = migration.NewService(p.store)
 
 	commandClient, err := command.NewCommandHandler(p.client, p.tasks, p.events, command.WithDefaultEventMinutes(func() int {
 		return p.getConfiguration().eventDurationMinutes()
@@ -79,7 +82,7 @@ func (p *Plugin) OnActivate() error {
 	}
 	p.commandClient = commandClient
 
-	p.httpHandler = api.NewHandler(p.API, p.client, p.access, p.tasks, p.events, p.prefs)
+	p.httpHandler = api.NewHandler(p.API, p.client, p.access, p.tasks, p.events, p.prefs, p.migration)
 	p.httpHandler.SetClientConfig(func() api.ClientConfig {
 		return api.ClientConfig{DefaultEventDurationMinutes: p.getConfiguration().eventDurationMinutes()}
 	})
@@ -115,7 +118,7 @@ func (p *Plugin) stopReminders() {
 // bot must not prevent tasks from working, so the error is logged and notifications are skipped.
 func (p *Plugin) ensureBot() string {
 	botUserID, err := p.client.Bot.EnsureBot(&model.Bot{
-		Username:    "tasks-bot",
+		Username:    "agenda-bot",
 		DisplayName: "Agenda",
 		Description: "Sends assignment notifications and reminders for the Agenda plugin.",
 	})

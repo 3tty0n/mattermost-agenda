@@ -39,7 +39,7 @@ accounts, no external service, no second database.
 
 ## Install
 
-1. Download `com.github.3tty0n.mattermost-tasks-*.tar.gz` from a release.
+1. Download `com.github.3tty0n.mattermost-agenda-*.tar.gz` from a release.
 2. In **System Console → Plugins → Plugin Management**, upload it and enable **Agenda**.
 
 Requires Mattermost 11.7.0+ (web or desktop; mobile does not load plugin UIs, use `/task` there).
@@ -164,12 +164,13 @@ SKIP_DOCKER_TESTS=1 go test ./server/...
 cd webapp && npx jest --runInBand
 ```
 
-The bundle is written to `dist/com.github.3tty0n.mattermost-tasks-<version>.tar.gz`.
+The bundle is written to `dist/com.github.3tty0n.mattermost-agenda-<version>.tar.gz`.
 
 **Storage:** full records `task:<id>` / `event:<id>`; compact, four-shard indexes per team, channel
 and user; no full KV scans. Reminders are queued in per-hour buckets (`reminder:<hour>`) and fired
 by a once-a-minute cluster job.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/API.md](docs/API.md) and
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Bookmarks is a separate plugin:
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/API.md](docs/API.md),
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and [docs/MIGRATION.md](docs/MIGRATION.md) (moving from the
+pre-rename `mattermost-tasks` plugin ID). Bookmarks is a separate plugin:
 [mattermost-bookmarks](https://github.com/3tty0n/mattermost-bookmarks).

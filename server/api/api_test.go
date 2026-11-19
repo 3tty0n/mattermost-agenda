@@ -16,6 +16,7 @@ import (
 
 	"github.com/3tty0n/mattermost-tasks/server/access"
 	"github.com/3tty0n/mattermost-tasks/server/events"
+	"github.com/3tty0n/mattermost-tasks/server/migration"
 	taskmodel "github.com/3tty0n/mattermost-tasks/server/model"
 	"github.com/3tty0n/mattermost-tasks/server/store/kvstore"
 	"github.com/3tty0n/mattermost-tasks/server/tasks"
@@ -30,12 +31,13 @@ func (noopPublisher) TaskChanged(string, *taskmodel.Task) {}
 func (noopPublisher) EventChanged(string, *taskmodel.Event) {}
 
 type apiTestEnv struct {
-	handler *Handler
-	api     *testutil.API
-	store   kvstore.Store
-	tasks   *tasks.Service
-	events  *events.EventService
-	prefs   *userprefs.Service
+	handler   *Handler
+	api       *testutil.API
+	store     kvstore.Store
+	tasks     *tasks.Service
+	events    *events.EventService
+	prefs     *userprefs.Service
+	migration *migration.Service
 }
 
 func newAPITestEnv(t *testing.T) *apiTestEnv {
@@ -49,13 +51,15 @@ func newAPITestEnv(t *testing.T) *apiTestEnv {
 	taskService := tasks.NewService(client, store, checker, publisher, nil, tasks.WithClock(func() int64 { return 1000 }))
 	eventService := events.NewEventService(client, store, checker, publisher, events.WithEventClock(func() int64 { return 1000 }))
 	prefsService := userprefs.NewService(store)
+	migrationService := migration.NewService(store)
 	return &apiTestEnv{
-		handler: NewHandler(api, client, checker, taskService, eventService, prefsService),
-		api:     api,
-		store:   store,
-		tasks:   taskService,
-		events:  eventService,
-		prefs:   prefsService,
+		handler:   NewHandler(api, client, checker, taskService, eventService, prefsService, migrationService),
+		api:       api,
+		store:     store,
+		tasks:     taskService,
+		events:    eventService,
+		prefs:     prefsService,
+		migration: migrationService,
 	}
 }
 
@@ -91,6 +95,10 @@ func denyAdmin(api *testutil.API, userID string) {
 	api.On("HasPermissionTo", userID, model.PermissionManageSystem).Return(false).Maybe()
 }
 
+func allowAdmin(api *testutil.API, userID string) {
+	api.On("HasPermissionTo", userID, model.PermissionManageSystem).Return(true).Maybe()
+}
+
 func TestAllRoutesRejectUnauthenticatedRequests(t *testing.T) {
 	env := newAPITestEnv(t)
 	id := model.NewId()
@@ -112,6 +120,8 @@ func TestAllRoutesRejectUnauthenticatedRequests(t *testing.T) {
 		{http.MethodGet, "/api/v1/config"},
 		{http.MethodGet, "/api/v1/me/calendar-colors"},
 		{http.MethodPut, "/api/v1/me/calendar-colors"},
+		{http.MethodGet, "/api/v1/admin/export"},
+		{http.MethodPost, "/api/v1/admin/import"},
 	}
 	for _, route := range routes {
 		t.Run(route.method+" "+route.path, func(t *testing.T) {
@@ -277,6 +287,28 @@ func TestConfigAPI(t *testing.T) {
 	env.handler.SetClientConfig(func() ClientConfig { return ClientConfig{DefaultEventDurationMinutes: 30} })
 	got = decodeResponse[ClientConfig](t, env.serve(http.MethodGet, "/api/v1/config", "", actorID))
 	assert.Equal(t, 30, got.DefaultEventDurationMinutes)
+}
+
+func TestMigrationAPI(t *testing.T) {
+	env := newAPITestEnv(t)
+	adminID, regularID := model.NewId(), model.NewId()
+	allowAdmin(env.api, adminID)
+	denyAdmin(env.api, regularID)
+
+	// The export carries every user's data, so only a system administrator may call either route.
+	w := env.serve(http.MethodGet, "/api/v1/admin/export", "", regularID)
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	w = env.serve(http.MethodPost, "/api/v1/admin/import", `{}`, regularID)
+	assert.Equal(t, http.StatusForbidden, w.Code)
+
+	w = env.serve(http.MethodGet, "/api/v1/admin/export", "", adminID)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+	// Importing the just-made export writes nothing new and reports every key as skipped.
+	w = env.serve(http.MethodPost, "/api/v1/admin/import", w.Body.String(), adminID)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	assert.JSONEq(t, `{"written":0,"skipped":0}`, w.Body.String())
 }
 
 func TestCalendarColorsAPI(t *testing.T) {

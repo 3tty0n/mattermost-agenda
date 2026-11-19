@@ -5,6 +5,7 @@ package kvstore
 
 import (
 	"errors"
+	"slices"
 	"sync"
 
 	"github.com/mattermost/mattermost/server/public/pluginapi"
@@ -28,6 +29,7 @@ type KV interface {
 	CompareAndSet(key string, oldValue []byte, newValue any) (bool, error)
 	Update(key string, fn func(oldValue []byte) (newValue any, err error)) error
 	Delete(key string) error
+	List(page, count int) ([]string, error)
 }
 
 // pluginKV adapts pluginapi.KVService to KV.
@@ -59,6 +61,10 @@ func (p pluginKV) Update(key string, fn func(oldValue []byte) (any, error)) erro
 
 func (p pluginKV) Delete(key string) error {
 	return p.client.KV.Delete(key)
+}
+
+func (p pluginKV) List(page, count int) ([]string, error) {
+	return p.client.KV.ListKeys(page, count)
 }
 
 // memoryKV is a small in-memory KV implementation for unit tests and benchmarks.
@@ -144,6 +150,25 @@ func (m *memoryKV) Delete(key string) error {
 	defer m.mu.Unlock()
 	delete(m.data, key)
 	return nil
+}
+
+func (m *memoryKV) List(page, count int) ([]string, error) {
+	m.mu.RLock()
+	keys := make([]string, 0, len(m.data))
+	for key := range m.data {
+		keys = append(keys, key)
+	}
+	m.mu.RUnlock()
+	slices.Sort(keys)
+	start := page * count
+	if start >= len(keys) {
+		return nil, nil
+	}
+	end := start + count
+	if end > len(keys) {
+		end = len(keys)
+	}
+	return keys[start:end], nil
 }
 
 func bytesEqual(a, b []byte) bool {

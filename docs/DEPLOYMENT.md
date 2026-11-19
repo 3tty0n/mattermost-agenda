@@ -10,7 +10,7 @@
 
 ## Install
 
-1. Build or download the bundle: `dist/com.github.3tty0n.mattermost-tasks-<version>.tar.gz`.
+1. Build or download the bundle: `dist/com.github.3tty0n.mattermost-agenda-<version>.tar.gz`.
    Release bundles are stripped (`-s -w`). The default release contains one linux-amd64 server
    binary; macOS binaries are included only in a release explicitly built with `macos=true`.
 2. **System Console → Plugins → Plugin Management → Upload Plugin**.
