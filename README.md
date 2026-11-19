@@ -162,6 +162,7 @@ make apply                          # generate manifests from plugin.json
 make test                           # server + webapp tests and the bundle
 SKIP_DOCKER_TESTS=1 go test ./server/...
 cd webapp && npx jest --runInBand
+make deploy-auto                    # build + upload via REST (login handled by build/deploy.sh)
 ```
 
 The bundle is written to `dist/com.github.3tty0n.mattermost-agenda-<version>.tar.gz`.

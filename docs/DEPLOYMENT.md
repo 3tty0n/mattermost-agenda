@@ -22,6 +22,21 @@
 Upload the new bundle and enable it. Task records and indexes are stored under the plugin ID; no
 database migration is required. Restarting the plugin or Mattermost does not clear data.
 
+## Automatic deploy
+
+`build/deploy.sh` (or `make deploy-auto`) builds the bundle and uploads it over the REST API —
+the same upload `make deploy` uses, plus redirect resolution and flexible admin login:
+
+```bash
+export MM_SERVICESETTINGS_SITEURL=https://mattermost.example.com
+export MM_ADMIN_TOKEN=...        # or MM_ADMIN_EMAIL + MM_ADMIN_PASSWORD
+./build/deploy.sh
+```
+
+The account must be a system administrator and plugin uploads must be enabled. `SKIP_BUILD=1`
+re-uploads the existing `dist` bundle without rebuilding; re-running is otherwise safe (uploads
+are forced, the plugin is re-enabled, and its API is verified at the end).
+
 ## Rollback
 
 Disable the plugin. Data remains in the plugin KV store. Re-enabling the same or a newer bundle
